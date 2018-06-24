@@ -1,0 +1,6 @@
+[submodule "third_party/common"]
+	path = third_party/common
+	url = ssh://dbpotato.net/repos/common.git
+[submodule "third_party/spdlog"]
+	path = third_party/spdlog
+	url = https://github.com/gabime/spdlog.git

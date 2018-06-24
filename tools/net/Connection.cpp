@@ -1,0 +1,313 @@
+/*
+Copyright (c) 2018 Adam Kaniewski
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+#include "Connection.h"
+#include "Message.h"
+#include "Client.h"
+#include "Server.h"
+#include "Logger.h"
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <cstring>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/signal.h>
+
+const int SOC_READ_BUFF_SIZE = 2048;
+const int READ_WRITE_IDDLE_TIME = 25 * 1000; //microseconds
+
+timeval cn_timeout() {
+  struct timeval timeout;
+  timeout.tv_sec = 0;
+  timeout.tv_usec = READ_WRITE_IDDLE_TIME;
+  return timeout;
+}
+
+Data::Data()
+  : _size(0) {
+}
+
+Connection::Connection()
+    : _red_buff_lenght(SOC_READ_BUFF_SIZE) {
+  signal(SIGPIPE, SIG_IGN);
+}
+
+Connection::~Connection() {
+}
+
+std::shared_ptr<Client> Connection::CreateClient(int port, const std::string& host) {
+  ThreadCheck();
+  std::shared_ptr<Client> client;
+  int socket = CreateSocket(port, host);
+  if(socket < 0)
+    return client;
+
+  client.reset(new Client());
+  AddClient(socket, client);
+  return client;
+}
+
+std::shared_ptr<Server> Connection::CreateServer(int port) {
+  std::shared_ptr<Server> server;
+  int socket = CreateSocket(port, "", true);
+  if(socket < 0)
+    return server;
+
+  server.reset(new Server(socket, shared_from_this()));
+  return server;
+}
+
+int Connection::CreateSocket(int port, const std::string& host, bool do_listen) {
+  int soc = socket(AF_INET, SOCK_STREAM, 0);
+  if (soc < 0) {
+    DLOG(error, "Connection::Create socket fail : {}", soc);
+    return soc;
+  }
+
+  sockaddr_in serv_addr;
+  serv_addr.sin_family = AF_INET;
+  serv_addr.sin_addr.s_addr = INADDR_ANY;
+  serv_addr.sin_port = htons(port);
+
+  if(!host.empty()) {
+    hostent* server = gethostbyname(host.c_str());
+    if(!server) {
+       DLOG(error, "Connection::Create gethostbyname fail");
+       return -1;
+    }
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+  }
+
+
+  if(do_listen) {
+
+    int reuse = 1;
+    if (setsockopt(soc, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
+        DLOG(error, "Connection::Create set SO_REUSEADDR fail");
+        return -1;
+    }
+
+    int res = bind(soc, (sockaddr*) &serv_addr, sizeof(serv_addr));
+    if(res < 0) {
+      DLOG(error, "Connection::Create bind fail : {}", res);
+      return -1;
+    }
+
+    res = listen(soc, 256);
+    if(res < 0) {
+      DLOG(error, "Connection::Create listen fail : {}", res);
+      return -1;
+    }
+  }
+  else {
+    int res = connect(soc, (sockaddr*) &serv_addr, sizeof(serv_addr));
+    if(res < 0) {
+      DLOG(error, "Connection::Create connect fail : {}", res);
+      return -1;
+    }
+  }
+
+  return AfterSocketCreated(soc, do_listen);
+}
+
+int Connection::AfterSocketCreated(int soc, bool listen_soc) {
+  return soc;
+}
+
+std::shared_ptr<Client> Connection::Accept(int listen_soc) {
+  ThreadCheck();
+  std::shared_ptr<Client> client;
+  sockaddr_in client_addr;
+  socklen_t client_addr_len = sizeof(client_addr);
+  int socket = accept(listen_soc,(sockaddr*) &client_addr,&client_addr_len);
+
+  socket = AfterSocketAccepted(socket);
+
+  if(socket < 0)
+    return client;
+
+  client.reset(new Client());
+  AddClient(socket, client);
+  return client;
+}
+
+int Connection::AfterSocketAccepted(int soc) {
+  return soc;
+}
+
+void Connection::Close(int soc){
+  close(soc);
+}
+
+Data Connection::Read(int soc) {
+  Data data;
+  int read_len = 0;
+  unsigned char buff[_red_buff_lenght];
+
+  read_len = SocketRead(soc, buff, _red_buff_lenght);
+
+  if (read_len <= 0) {
+    return data;
+  }
+
+  if(read_len) {
+    std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len], std::default_delete<unsigned char[]>());
+    std::memcpy(data_sptr.get(), (void*)(buff), read_len);
+    data._size = read_len;
+    data._data = data_sptr;
+  }
+
+  return data;
+}
+
+int Connection::SocketRead(int soc, void* dest, int dest_lenght) {
+  return read(soc, dest, dest_lenght);
+}
+
+int Connection::SocketWrite(int soc, void* buffer, int size) {
+  return write(soc, buffer, size);
+}
+
+bool Connection::Write(int soc, std::shared_ptr<Message> msg) {
+
+  ssize_t result = 0;
+
+  if(!msg->_is_raw) {
+    uint8_t header[MESSAGE_HEADER_LENGTH];
+    std::memcpy(header, &msg->_type, sizeof(msg->_type));
+    std::memcpy(header + sizeof(msg->_type), &msg->_size, sizeof(msg->_size));
+
+    result = SocketWrite(soc, header, MESSAGE_HEADER_LENGTH);
+    if(result != MESSAGE_HEADER_LENGTH) {
+      return false;
+    }
+  }
+
+  if(msg->_size) {
+    result = SocketWrite(soc, msg->_data.get(), msg->_size);
+    if(result !=  msg->_size) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+
+void Connection::Init() {
+  _run_thread.Run(shared_from_this(), 1);
+}
+
+void Connection::OnThreadStarted(int thread_id) {
+  while(_run_thread.ShouldRun()) {
+    PerformSelect();
+  }
+}
+
+void Connection::Stop() {
+  _run_thread.Stop();
+}
+
+void Connection::AddClient(int socket, std::weak_ptr<Client> client) {
+  std::lock_guard<std::mutex> lock(_client_mutex);
+  _sockets.insert(std::make_pair(socket, client));
+}
+
+void Connection::PerformSelect() {
+
+  int max_fd = -1;
+  std::vector<std::pair<Data, std::weak_ptr<Client> > > results;
+  fd_set rfds, wfds;
+  FD_ZERO(&rfds);
+  FD_ZERO(&wfds);
+  _client_mutex.lock();
+
+  auto it = _sockets.begin();
+  auto it_end = _sockets.end();
+  while(it != it_end) {
+    if(auto client = it->second.lock()) {
+      if(client->IsStarted()) {
+        FD_SET(it->first, &rfds);
+        if(client->MsgQueueSize())
+          FD_SET(it->first, &wfds);
+
+        if(it->first > max_fd)
+          max_fd = it->first;
+      }
+      ++it;
+    }
+    else {
+      Close(it->first);
+      it = _sockets.erase(it);
+    }
+  }
+
+  _client_mutex.unlock();
+
+  if(max_fd == -1) {
+    usleep(READ_WRITE_IDDLE_TIME);
+    return;
+  }
+
+  timeval timeout = cn_timeout();
+  int res = select(max_fd +1, &rfds, &wfds, NULL, &timeout);
+
+  _client_mutex.lock();
+  if(res >= 0 ) {
+    it = _sockets.begin();
+    while(it != it_end) {
+      if(FD_ISSET(it->first, &rfds)) {
+        Data data = Read(it->first);
+        results.push_back(std::make_pair(data, it->second));
+      }
+      if(FD_ISSET(it->first, &wfds)) {
+        if(auto client = it->second.lock()) {
+          while(auto msg = client->RemoveMsg()) {
+            bool ok = Write(it->first, msg);
+            client->OnWrite(msg, ok);
+          }
+        }
+      }
+      ++it;
+    }
+  }
+  else {
+    usleep(READ_WRITE_IDDLE_TIME);
+    DLOG(error, "Connection : select failed with err : {}", res);
+  }
+  _client_mutex.unlock();
+
+  for(auto pair : results) {
+    if(auto client = pair.second.lock())
+      client->OnRead(pair.first);
+  }
+}
+
+void Connection::ThreadCheck() {
+  if(!_run_thread.IsRunning())
+    log()->warn("Connection was not intialized");
+}
