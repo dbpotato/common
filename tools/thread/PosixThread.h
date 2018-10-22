@@ -21,55 +21,34 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include "Server.h"
-#include "Logger.h"
+#pragma once
 
-timeval default_listen_timeout() {
-  struct timeval timeout;
-  timeout.tv_sec = 1;
-  timeout.tv_usec = 0;
-  return timeout;
-}
+#include <pthread.h>
+#include <atomic>
+#include <memory>
 
-Server::Server(int socket, std::shared_ptr<Connection> connection)
-    : _connection(connection)
-    , _socket(socket)
-    , _started(false){
-}
 
-Server::~Server() {
-  _run_thread.Stop();
-  _run_thread.Join();
-  _connection->Close(_socket);
-}
+class ThreadObject {
+ public :
+  virtual void OnThreadStarted(int thread_id) = 0;
+};
 
-bool Server::Init(std::weak_ptr<ServerManager> mgr) {
-  if(_started) {
-    log()->error("Server already started");
-    return false;
-  }
 
-  _manager = mgr;
-  _started = true;
+class PosixThread {
+protected:
+  std::weak_ptr<ThreadObject> _thread_obj;
+  pthread_t _thread;
+  int _id;
+  std::atomic_bool _is_running;
+  std::atomic_bool _should_run;
+  static void* StartThread(void* obj);
 
-  _run_thread.Run(shared_from_this());
-  return true;
-}
-
-void Server::OnThreadStarted(int thread_id) {
-  Listen();
-}
-
-void Server::Listen() {
-  while(_run_thread.ShouldRun()) {
-     std::shared_ptr<Client> client = _connection->Accept(_socket);
-     if (client) {
-       if(auto manager = _manager.lock()) {
-         manager->OnClientConnected(client);
-       }
-     }
-     else {
-       log()->error("Server: accept failed");
-     }
-  }
-}
+public:
+  PosixThread();
+  bool Run(std::weak_ptr<ThreadObject> obj, int id = 0);
+  std::weak_ptr<ThreadObject> GetObj();
+  void Stop();
+  std::atomic_bool& IsRunning();
+  std::atomic_bool& ShouldRun();
+  void Join();
+};
