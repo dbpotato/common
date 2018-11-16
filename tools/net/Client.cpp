@@ -25,9 +25,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Message.h"
 #include "Logger.h"
 
+#include <limits>
+
+std::atomic<uint32_t> Client::_id_counter(0);
+uint32_t Client::NextId() {
+  if(_id_counter == std::numeric_limits<uint32_t>::max())
+    log()->error("Client's id counter overflow");
+  return ++_id_counter;
+}
 
 Client::Client()
-  : _id(-1)
+  : _id(NextId())
   , _is_raw(false)
   , _is_started(false) {
 }
@@ -45,9 +53,8 @@ void Client::Send(std::shared_ptr<Message> msg) {
   _msg_query.push_back(msg);
 }
 
-void Client::Start(int id, std::weak_ptr<ClientManager> mgr, bool is_raw) {
+void Client::Start(std::weak_ptr<ClientManager> mgr, bool is_raw) {
   if(!_is_started) {
-    _id = id;
     _manager = mgr;
     _is_raw = is_raw;
     _is_started = true;

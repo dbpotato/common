@@ -45,7 +45,7 @@ friend std::shared_ptr<Client> Connection::Accept(int);
 
 public:
   ~Client();
-  void Start(int id, std::weak_ptr<ClientManager> mgr, bool is_raw = false);
+  void Start(std::weak_ptr<ClientManager> mgr, bool is_raw = false);
   void OnClosed();
   void Send(std::shared_ptr<Message> msg);
   int GetId();
@@ -56,6 +56,8 @@ public:
   std::atomic_bool& IsStarted();
 
 protected:
+  static uint32_t NextId();
+
   int _id;
   std::weak_ptr<ClientManager> _manager;
   std::mutex _mutex;
@@ -63,6 +65,7 @@ protected:
   bool _is_raw;
   std::atomic_bool _is_started;
   MessageBuilder _msg_builder;
+  static std::atomic<uint32_t> _id_counter;
 private:
   Client();
 };
