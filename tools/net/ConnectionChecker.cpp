@@ -1,31 +1,54 @@
 #include "ConnectionChecker.h"
+/*
+Copyright (c) 2018 Adam Kaniewski
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*/
+
+#include "Connection.h"
+#include "Logger.h"
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <ctime>
+#include <chrono>
+#include <thread>
 
-#include "Connection.h"
-#include "Logger.h"
 
 time_t CurrentTime() {
-  time_t timer;
-  time(&timer);
-  return timer;
+  return std::chrono::system_clock::to_time_t( std::chrono::system_clock::now());
 }
 
 ConnectionChecker::ConnectionChecker(std::weak_ptr<ConnectionKeeper> keeper,
                   std::shared_ptr<Connection> connection,
-                  size_t check_interval,
+                  size_t check_interval_in_sec,
                   const std::string& server_url,
                   int server_port)
   : _keeper(keeper)
   , _connection(connection)
-  , _check_interval(check_interval)
+  , _check_interval_in_sec(check_interval_in_sec)
   , _server_url(server_url)
   , _server_port(server_port)
   , _last_alive(0)
-  , _status(NOT_CONNECTED) {
+  , _state(NOT_CONNECTED) {
 }
 
 ConnectionChecker::~ConnectionChecker() {
@@ -34,48 +57,51 @@ ConnectionChecker::~ConnectionChecker() {
 }
 
 void ConnectionChecker::Init() {
-    _alive_check.Run(shared_from_this());
+  _alive_check.Run(shared_from_this());
 }
 
-void ConnectionChecker::SetStatus(ConnectionChecker::ConnectionStatus status) {
-  if(_status != status) {
-    switch (status) {
-      case NOT_CONNECTED:
-        DLOG(info, "ConnectStatus: NOT_CONNECTED");
-        break;
-      case CONNECTED:
-        DLOG(info, "ConnectStatus: CONNECTED");
-        break;
-      case MAYBE_CONNECTED:
-        DLOG(info, "ConnectStatus: MAYBE_CONNECTED");
-        break;
-      default:
-        break;
+void ConnectionChecker::SetState(ConnectionState new_state) {
+  if(_state != new_state) {
+    if(auto keeper = _keeper.lock()) {
+      switch (new_state) {
+        case NOT_CONNECTED:
+          keeper->OnDisconnected();
+          DLOG(info, "ConnectStatus: NOT_CONNECTED");
+          break;
+        case CONNECTED:
+          if(_state == NOT_CONNECTED)
+            keeper->OnConnected(_current_client);
+          DLOG(info, "ConnectStatus: CONNECTED");
+          break;
+        case MAYBE_CONNECTED:
+          keeper->SendPing();
+          DLOG(info, "ConnectStatus: MAYBE_CONNECTED");
+          break;
+        default:
+          break;
+      }
     }
+    _state = new_state;
   }
-  _status = status;
 }
 
 void ConnectionChecker::OnThreadStarted(int id){
   while(_alive_check.ShouldRun()) {
     DoConnectionCheck();
-    sleep(_check_interval);
+    std::this_thread::sleep_for(std::chrono::seconds(_check_interval_in_sec));
   }
 }
 
 void ConnectionChecker::DoConnectionCheck() {
   time_t time = CurrentTime();
-  if(time > _last_alive + _check_interval) {
-    ConnectionStatus status = _status;
-    switch (status) {
+  if(time > _last_alive + (time_t)_check_interval_in_sec) {
+    switch (_state) {
       case NOT_CONNECTED:
       case MAYBE_CONNECTED:
         TryConnect();
         break;
       case CONNECTED:
-        SetStatus(MAYBE_CONNECTED);
-        if(auto keeper = _keeper.lock())
-          keeper->SendPing();
+        SetState(MAYBE_CONNECTED);
         break;
       default:
         break;
@@ -84,23 +110,16 @@ void ConnectionChecker::DoConnectionCheck() {
 }
 
 void ConnectionChecker::TryConnect() {
-  std::shared_ptr<ConnectionKeeper> keeper;
-  if(keeper = _keeper.lock())
-    keeper->OnDisconnected();
-  else
-    return;
-
-  auto client = _connection->CreateClient(_server_port, _server_url);
-  if(client) {
-    SetStatus(CONNECTED);
-    keeper->OnConnected(client);
+  _current_client = _connection->CreateClient(_server_port, _server_url);
+  if(_current_client) {
+    SetState(CONNECTED);
   }
   else {
-    SetStatus(NOT_CONNECTED);
+    SetState(NOT_CONNECTED);
   }
 }
 
 void ConnectionChecker::Wake() {
   _last_alive = CurrentTime();
-  SetStatus(CONNECTED);
+  SetState(CONNECTED);
 }
