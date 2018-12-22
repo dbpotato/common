@@ -46,7 +46,6 @@ friend std::shared_ptr<Client> Connection::Accept(int);
 public:
   ~Client();
   void Start(std::weak_ptr<ClientManager> mgr, bool is_raw = false);
-  void OnClosed();
   void Send(std::shared_ptr<Message> msg);
   int GetId();
   size_t MsgQueueSize();
