@@ -34,10 +34,13 @@ uint32_t Client::NextId() {
   return ++_id_counter;
 }
 
-Client::Client()
-  : _id(NextId())
-  , _is_raw(false)
-  , _is_started(false) {
+Client::Client(const std::string& ip, int port, const std::string& url)
+    : _id(NextId())
+    , _is_raw(false)
+    , _is_started(false)
+    , _url(url)
+    , _ip(ip)
+    , _port(port) {
 }
 
 Client::~Client() {
@@ -46,6 +49,18 @@ Client::~Client() {
 
 int Client::GetId() {
   return _id;
+}
+
+const std::string& Client::GetUrl() {
+  return _url;
+}
+
+const std::string& Client::GetIp() {
+  return _ip;
+}
+
+int Client::GetPort() {
+  return _port;
 }
 
 void Client::Send(std::shared_ptr<Message> msg) {

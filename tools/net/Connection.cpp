@@ -36,6 +36,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <netinet/in.h>
 #include <netdb.h>
 #include <sys/signal.h>
+#include <arpa/inet.h>
 
 const int SOC_LISTEN = 256;
 const int SOC_READ_BUFF_SIZE = 2048;
@@ -63,18 +64,20 @@ Connection::~Connection() {
 std::shared_ptr<Client> Connection::CreateClient(int port, const std::string& host) {
   ThreadCheck();
   std::shared_ptr<Client> client;
-  int socket = CreateSocket(port, host);
+  std::string ip;
+  int socket = CreateSocket(port, host, ip);
   if(socket < 0)
     return client;
 
-  client.reset(new Client());
+  client.reset(new Client(ip, port, host));
   AddClient(socket, client);
   return client;
 }
 
 std::shared_ptr<Server> Connection::CreateServer(int port) {
   std::shared_ptr<Server> server;
-  int socket = CreateSocket(port, "", true);
+  std::string ip;
+  int socket = CreateSocket(port, "", ip, true);
   if(socket < 0)
     return server;
 
@@ -83,9 +86,10 @@ std::shared_ptr<Server> Connection::CreateServer(int port) {
 }
 
 
-int Connection::CreateSocket(int port, const std::string& host, bool is_server_socket) {
+int Connection::CreateSocket(int port, const std::string& host, std::string& out_ip, bool is_server_socket) {
   struct addrinfo hints;
-  struct addrinfo *result = nullptr;
+  struct addrinfo* result = nullptr;
+  struct addrinfo* rp = nullptr;
   int sfd = -1;
   int gai_res = -1;
 
@@ -105,7 +109,7 @@ int Connection::CreateSocket(int port, const std::string& host, bool is_server_s
     return -1;
   }
 
-  for (addrinfo* rp = result; rp; rp = rp->ai_next) {
+  for (rp = result; rp; rp = rp->ai_next) {
     sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
     if (sfd == -1)
       continue;
@@ -132,11 +136,19 @@ int Connection::CreateSocket(int port, const std::string& host, bool is_server_s
     sfd = -1;
   }
 
+  if(rp) {
+    char ipstr[INET_ADDRSTRLEN];
+    struct sockaddr_in* ipv = (struct sockaddr_in *)rp->ai_addr;
+    struct in_addr* addr = &(ipv->sin_addr);
+    inet_ntop(rp->ai_family, addr, ipstr, sizeof ipstr);
+    out_ip = std::string(ipstr);
+  }
+
   freeaddrinfo(result);
 
   if(sfd < 0) {
     DLOG(error, "Connection::CreateSocket fail");
-    return sdf;
+    return sfd;
   }
 
   return AfterSocketCreated(sfd, is_server_socket);
@@ -148,17 +160,31 @@ int Connection::AfterSocketCreated(int soc, bool listen_soc) {
 
 std::shared_ptr<Client> Connection::Accept(int listen_soc) {
   ThreadCheck();
-  std::shared_ptr<Client> client;
-  sockaddr_in client_addr;
-  socklen_t client_addr_len = sizeof(client_addr);
-  int socket = accept(listen_soc,(sockaddr*) &client_addr, &client_addr_len);
 
+  std::shared_ptr<Client> client;
+  struct sockaddr client_addr;
+
+  socklen_t client_addr_len = sizeof client_addr;
+  int socket = accept(listen_soc, &client_addr, &client_addr_len);
   socket = AfterSocketAccepted(socket);
 
-  if(socket < 0)
-    return client;
 
-  client.reset(new Client());
+  char host_buf[NI_MAXHOST];
+  char port_buf[NI_MAXSERV];
+
+  int res = getnameinfo (&client_addr, client_addr_len,
+                         host_buf, sizeof host_buf,
+                         port_buf, sizeof port_buf,
+                         NI_NUMERICHOST | NI_NUMERICSERV);
+  if(res != 0)
+    DLOG(error, "Connection::Accept getnameinfo fail");
+
+  if(socket < 0) {
+    DLOG(error, "Connection::Accept fail");
+    return client;
+  }
+
+  client.reset(new Client(std::string(host_buf), std::stoi(std::string(port_buf))));
   AddClient(socket, client);
   return client;
 }

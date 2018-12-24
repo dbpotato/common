@@ -53,7 +53,9 @@ public:
   void OnWrite(std::shared_ptr<Message> msg, bool status);
   std::shared_ptr<Message> RemoveMsg();
   std::atomic_bool& IsStarted();
-
+  const std::string& GetUrl();
+  const std::string& GetIp();
+  int GetPort();
 protected:
   static uint32_t NextId();
 
@@ -66,5 +68,8 @@ protected:
   MessageBuilder _msg_builder;
   static std::atomic<uint32_t> _id_counter;
 private:
-  Client();
+  Client(const std::string& ip = "", int port = -1, const std::string& url = "");
+  std::string _url;
+  std::string _ip;
+  int _port;
 };
