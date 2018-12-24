@@ -37,6 +37,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <netdb.h>
 #include <sys/signal.h>
 
+const int SOC_LISTEN = 256;
 const int SOC_READ_BUFF_SIZE = 2048;
 const int READ_WRITE_IDDLE_TIME = 25 * 1000; //microseconds
 
@@ -81,57 +82,64 @@ std::shared_ptr<Server> Connection::CreateServer(int port) {
   return server;
 }
 
-int Connection::CreateSocket(int port, const std::string& host, bool do_listen) {
-  int soc = socket(AF_INET, SOCK_STREAM, 0);
-  if (soc < 0) {
-    DLOG(error, "Connection::Create socket fail : {}", soc);
-    return soc;
+
+int Connection::CreateSocket(int port, const std::string& host, bool is_server_socket) {
+  struct addrinfo hints;
+  struct addrinfo *result = nullptr;
+  int sfd = -1;
+  int gai_res = -1;
+
+  memset(&hints, 0, sizeof(struct addrinfo));
+  hints.ai_family = AF_INET;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_PASSIVE;
+  hints.ai_protocol = IPPROTO_TCP;
+
+  if(is_server_socket)
+    gai_res = getaddrinfo(nullptr, std::to_string(port).c_str(), &hints, &result);
+  else
+    gai_res = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &result);
+  if (gai_res != 0) {
+    DLOG(error, "Connection::CreateSocket getaddrinfo: {}", gai_strerror(gai_res));
+    freeaddrinfo(result);
+    return -1;
   }
 
-  sockaddr_in serv_addr;
-  serv_addr.sin_family = AF_INET;
-  serv_addr.sin_addr.s_addr = INADDR_ANY;
-  serv_addr.sin_port = htons(port);
+  for (addrinfo* rp = result; rp; rp = rp->ai_next) {
+    sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (sfd == -1)
+      continue;
 
-  if(!host.empty()) {
-    hostent* server = gethostbyname(host.c_str());
-    if(!server) {
-       DLOG(error, "Connection::Create gethostbyname fail");
-       return -1;
+    if(!is_server_socket) {
+      if(connect(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+        break;
+      else
+        DLOG(warn, "Connection::CreateSocket connect fail");
     }
-    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    else {
+      int reuse = 1;
+      if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) == -1)
+        DLOG(warn, "Connection::CreateSocket set SO_REUSEADDR fail");
+      else if(bind(sfd, rp->ai_addr, rp->ai_addrlen) == -1)
+        DLOG(warn, "Connection::CreateSocket bind fail");
+      else if(listen(sfd, SOC_LISTEN) == -1)
+        DLOG(warn, "Connection::CreateSocket listen fail");
+      else
+        break;
+    }
+
+    close(sfd);
+    sfd = -1;
   }
 
+  freeaddrinfo(result);
 
-  if(do_listen) {
-
-    int reuse = 1;
-    if (setsockopt(soc, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0) {
-        DLOG(error, "Connection::Create set SO_REUSEADDR fail");
-        return -1;
-    }
-
-    int res = bind(soc, (sockaddr*) &serv_addr, sizeof(serv_addr));
-    if(res < 0) {
-      DLOG(error, "Connection::Create bind fail : {}", res);
-      return -1;
-    }
-
-    res = listen(soc, 256);
-    if(res < 0) {
-      DLOG(error, "Connection::Create listen fail : {}", res);
-      return -1;
-    }
-  }
-  else {
-    int res = connect(soc, (sockaddr*) &serv_addr, sizeof(serv_addr));
-    if(res < 0) {
-      DLOG(error, "Connection::Create connect fail : {}", res);
-      return -1;
-    }
+  if(sfd < 0) {
+    DLOG(error, "Connection::CreateSocket fail");
+    return sdf;
   }
 
-  return AfterSocketCreated(soc, do_listen);
+  return AfterSocketCreated(sfd, is_server_socket);
 }
 
 int Connection::AfterSocketCreated(int soc, bool listen_soc) {
@@ -143,7 +151,7 @@ std::shared_ptr<Client> Connection::Accept(int listen_soc) {
   std::shared_ptr<Client> client;
   sockaddr_in client_addr;
   socklen_t client_addr_len = sizeof(client_addr);
-  int socket = accept(listen_soc,(sockaddr*) &client_addr,&client_addr_len);
+  int socket = accept(listen_soc,(sockaddr*) &client_addr, &client_addr_len);
 
   socket = AfterSocketAccepted(socket);
 

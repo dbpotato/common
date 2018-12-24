@@ -63,7 +63,7 @@ public:
   virtual void Close(int soc);
 
 protected :
-  int CreateSocket(int port, const std::string& host, bool do_listen = false);
+  int CreateSocket(int port, const std::string& host, bool is_server_socket = false);
   virtual int AfterSocketCreated(int soc, bool listen_soc);
   virtual int AfterSocketAccepted(int soc);
   virtual int SocketRead(int soc, void* dest, int dest_lenght);
