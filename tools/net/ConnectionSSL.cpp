@@ -31,6 +31,7 @@ int ConnectionSSL::AfterSocketCreated(int soc, bool listen_soc) {
   if (SSL_connect(ssl))
     _sessions.insert(std::make_pair(soc, ssl));
   else {
+    DLOG(error, "ConnectionSSL::AfterSocketCreated SSL_connect fail");
     close(soc);
     return -1;
   }
@@ -42,8 +43,9 @@ int ConnectionSSL::AfterSocketAccepted(int soc) {
   if(soc > -1) {
     SSL* ssl = SSL_new(_ctx);
     SSL_set_fd(ssl, soc);
-    if(SSL_accept(ssl) != 1) {
-      DLOG(error, "ConnectionSSL::Accept SSL_accept fail");
+    int accept_res = SSL_accept(ssl);
+    if(accept_res != 1) {
+      DLOG(error, "ConnectionSSL::Accept SSL_accept fail : {}", accept_res);
       close(soc);
       soc = -1;
     }

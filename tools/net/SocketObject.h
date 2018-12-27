@@ -24,26 +24,22 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "Connection.h"
-#include "SocketObject.h"
 
-class Client;
+#include <memory>
 
-class ServerManager {
-public:
-  virtual void OnClientConnected(std::shared_ptr<Client> client) = 0;
-};
+class Message;
 
-class Server : public SocketObject {
-
-friend class std::shared_ptr<Server> Connection::CreateServer(int);
+class SocketObject : public std::enable_shared_from_this<SocketObject> {
 
 public:
-  bool Init(std::weak_ptr<ServerManager> mgr);
-  void OnClientConnected(std::shared_ptr<Client> client) override;
-  bool IsActive() override;
-protected:
-  std::weak_ptr<ServerManager> _manager;
+ SocketObject(bool is_server_socket);
+ virtual bool NeedsWrite();
+ virtual std::shared_ptr<Message> GetNextMsg();
+ virtual void OnMsgWrite(std::shared_ptr<Message> msg, bool status);
+ virtual void OnDataRead(Data& data);
+ virtual void OnClientConnected(std::shared_ptr<Client> client);
+ virtual bool IsActive();
+ bool IsServerSocket();
 private:
-  Server();
-  bool _started;
+ bool _is_server_socket;
 };

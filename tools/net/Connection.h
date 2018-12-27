@@ -31,6 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <mutex>
 
 class Message;
+class SocketObject;
 class Client;
 class Server;
 
@@ -49,13 +50,12 @@ public:
   std::shared_ptr<Client> CreateClient(int port, const std::string& host);
   std::shared_ptr<Server> CreateServer(int port);
 
-  std::shared_ptr<Client> Accept(int listen_soc);
+  void Accept(int listen_soc);
   Data Read(int soc);
   bool Write(int soc, std::shared_ptr<Message>);
 
   void Init();
   void Stop();
-  void AddClient(std::weak_ptr<Client> client);
 
   //ThreadObject
   void OnThreadStarted(int thread_id) override;
@@ -68,12 +68,12 @@ protected :
   virtual int AfterSocketAccepted(int soc);
   virtual int SocketRead(int soc, void* dest, int dest_lenght);
   virtual int SocketWrite(int soc, void* buffer, int size);
-  
-  void AddClient(int socket, std::weak_ptr<Client> client);
+
+  void AddSocket(int socket, std::weak_ptr<SocketObject> client);
   void PerformSelect();
   void ThreadCheck();
   PosixThread _run_thread;
-  std::map<int, std::weak_ptr<Client> >  _sockets;
+  std::map<int, std::weak_ptr<SocketObject> >  _sockets;
   std::mutex _client_mutex;
   int _red_buff_lenght;
 };

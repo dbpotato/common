@@ -21,29 +21,33 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#pragma once
-
-#include "Connection.h"
 #include "SocketObject.h"
 
-class Client;
+SocketObject::SocketObject(bool is_server_socket)
+    : _is_server_socket(is_server_socket) {
+}
 
-class ServerManager {
-public:
-  virtual void OnClientConnected(std::shared_ptr<Client> client) = 0;
-};
+void SocketObject::OnDataRead(Data& data) {
+}
 
-class Server : public SocketObject {
+bool SocketObject::NeedsWrite() {
+  return false;
+}
 
-friend class std::shared_ptr<Server> Connection::CreateServer(int);
+std::shared_ptr<Message> SocketObject::GetNextMsg() {
+  return std::shared_ptr<Message>();
+}
 
-public:
-  bool Init(std::weak_ptr<ServerManager> mgr);
-  void OnClientConnected(std::shared_ptr<Client> client) override;
-  bool IsActive() override;
-protected:
-  std::weak_ptr<ServerManager> _manager;
-private:
-  Server();
-  bool _started;
-};
+void SocketObject::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
+}
+
+void SocketObject::OnClientConnected(std::shared_ptr<Client> client) {
+}
+
+bool SocketObject::IsActive() {
+  return false;
+}
+
+bool SocketObject::IsServerSocket() {
+  return _is_server_socket;
+}

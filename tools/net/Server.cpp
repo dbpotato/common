@@ -24,23 +24,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Server.h"
 #include "Logger.h"
 
-timeval default_listen_timeout() {
-  struct timeval timeout;
-  timeout.tv_sec = 1;
-  timeout.tv_usec = 0;
-  return timeout;
-}
-
-Server::Server(int socket, std::shared_ptr<Connection> connection)
-    : _connection(connection)
-    , _socket(socket)
-    , _started(false){
-}
-
-Server::~Server() {
-  _run_thread.Stop();
-  _run_thread.Join();
-  _connection->Close(_socket);
+Server::Server()
+    : SocketObject(true)
+    , _started(false) {
 }
 
 bool Server::Init(std::weak_ptr<ServerManager> mgr) {
@@ -48,28 +34,19 @@ bool Server::Init(std::weak_ptr<ServerManager> mgr) {
     log()->error("Server already started");
     return false;
   }
-
   _manager = mgr;
   _started = true;
-
-  _run_thread.Run(shared_from_this());
   return true;
 }
 
-void Server::OnThreadStarted(int thread_id) {
-  Listen();
-}
-
-void Server::Listen() {
-  while(_run_thread.ShouldRun()) {
-     std::shared_ptr<Client> client = _connection->Accept(_socket);
-     if (client) {
-       if(auto manager = _manager.lock()) {
-         manager->OnClientConnected(client);
-       }
-     }
-     else {
-       log()->error("Server: accept failed");
-     }
+void Server::OnClientConnected(std::shared_ptr<Client> client) {
+  if (client) {
+    if(auto manager = _manager.lock())
+      manager->OnClientConnected(client);
   }
 }
+
+bool Server::IsActive() {
+  return _started;
+}
+

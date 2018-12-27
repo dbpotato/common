@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "PosixThread.h"
 #include "MessageBuilder.h"
+#include "SocketObject.h"
 
 #include <mutex>
 
@@ -38,27 +39,30 @@ public:
   virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) = 0;
 };
 
-class Client : public std::enable_shared_from_this<Client> {
+class Client : public SocketObject {
 
 friend std::shared_ptr<Client> Connection::CreateClient(int, const std::string&);
-friend std::shared_ptr<Client> Connection::Accept(int);
+friend void Connection::Accept(int);
 
 public:
   ~Client();
   void Start(std::weak_ptr<ClientManager> mgr, bool is_raw = false);
   void Send(std::shared_ptr<Message> msg);
   int GetId();
-  size_t MsgQueueSize();
-  void OnRead(Data& data);
-  void OnWrite(std::shared_ptr<Message> msg, bool status);
-  std::shared_ptr<Message> RemoveMsg();
-  std::atomic_bool& IsStarted();
+
   const std::string& GetUrl();
   const std::string& GetIp();
   int GetPort();
+  std::shared_ptr<Client> SharedPtr();
+
+  bool NeedsWrite() override;
+  std::shared_ptr<Message> GetNextMsg() override;
+  void OnMsgWrite(std::shared_ptr<Message> msg, bool status) override;
+  void OnDataRead(Data& data) override;
+  bool IsActive() override;
+
 protected:
   static uint32_t NextId();
-
   int _id;
   std::weak_ptr<ClientManager> _manager;
   std::mutex _mutex;

@@ -35,7 +35,8 @@ uint32_t Client::NextId() {
 }
 
 Client::Client(const std::string& ip, int port, const std::string& url)
-    : _id(NextId())
+    : SocketObject(false)
+    , _id(NextId())
     , _is_raw(false)
     , _is_started(false)
     , _url(url)
@@ -78,7 +79,17 @@ void Client::Start(std::weak_ptr<ClientManager> mgr, bool is_raw) {
     log()->error("Client::Start - already started,id : {}", _id);
 }
 
-std::shared_ptr<Message> Client::RemoveMsg() {
+std::shared_ptr<Client> Client::SharedPtr() {
+  return std::static_pointer_cast<Client>(shared_from_this());
+}
+
+
+bool Client::NeedsWrite() {
+  std::lock_guard<std::mutex> lock(_mutex);
+  return _msg_query.size() > 0;
+}
+
+std::shared_ptr<Message> Client::GetNextMsg() {
   std::lock_guard<std::mutex> lock(_mutex);
   std::shared_ptr<Message> msg;
 
@@ -90,15 +101,15 @@ std::shared_ptr<Message> Client::RemoveMsg() {
   return msg;
 }
 
-size_t Client::MsgQueueSize() {
-  std::lock_guard<std::mutex> lock(_mutex);
-  return _msg_query.size();
+void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
+  if(auto manager = _manager.lock())
+    manager->OnMsgSent(SharedPtr(), msg, status);
 }
 
-void Client::OnRead(Data& data){
+void Client::OnDataRead(Data& data) {
   if(!data._size) {
     if(auto manager = _manager.lock()) {
-      manager->OnClientClosed(shared_from_this());
+      manager->OnClientClosed(SharedPtr());
     }
    return;
   }
@@ -109,21 +120,16 @@ void Client::OnRead(Data& data){
     if(msgs.size())
     if(auto manager = _manager.lock())
       for(auto msg : msgs)
-        manager->OnClientRead(shared_from_this(), msg);
+        manager->OnClientRead(SharedPtr(), msg);
   }
   else {
     auto msg = std::make_shared<Message>(0, data._size, data._data);
     msg->_is_raw = true;
     if(auto manager = _manager.lock())
-      manager->OnClientRead(shared_from_this(), msg);
+      manager->OnClientRead(SharedPtr(), msg);
   }
 }
 
-void Client::OnWrite(std::shared_ptr<Message> msg, bool status) {
-  if(auto manager = _manager.lock())
-    manager->OnMsgSent(shared_from_this(), msg, status);
-}
-
-std::atomic_bool& Client::IsStarted() {
+bool Client::IsActive() {
   return _is_started;
 }

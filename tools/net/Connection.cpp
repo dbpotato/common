@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Client.h"
 #include "Server.h"
 #include "Logger.h"
+#include "SocketObject.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -37,6 +38,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <netdb.h>
 #include <sys/signal.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 const int SOC_LISTEN = 256;
 const int SOC_READ_BUFF_SIZE = 2048;
@@ -70,18 +72,20 @@ std::shared_ptr<Client> Connection::CreateClient(int port, const std::string& ho
     return client;
 
   client.reset(new Client(ip, port, host));
-  AddClient(socket, client);
+  AddSocket(socket, client);
   return client;
 }
 
 std::shared_ptr<Server> Connection::CreateServer(int port) {
+  ThreadCheck();
   std::shared_ptr<Server> server;
   std::string ip;
   int socket = CreateSocket(port, "", ip, true);
   if(socket < 0)
     return server;
 
-  server.reset(new Server(socket, shared_from_this()));
+  server.reset(new Server());
+  AddSocket(socket, server);
   return server;
 }
 
@@ -151,6 +155,9 @@ int Connection::CreateSocket(int port, const std::string& host, std::string& out
     return sfd;
   }
 
+  if(is_server_socket)
+    fcntl(sfd, F_SETFL, O_NONBLOCK);
+
   return AfterSocketCreated(sfd, is_server_socket);
 }
 
@@ -158,35 +165,48 @@ int Connection::AfterSocketCreated(int soc, bool listen_soc) {
   return soc;
 }
 
-std::shared_ptr<Client> Connection::Accept(int listen_soc) {
-  ThreadCheck();
-
-  std::shared_ptr<Client> client;
-  struct sockaddr client_addr;
-
-  socklen_t client_addr_len = sizeof client_addr;
-  int socket = accept(listen_soc, &client_addr, &client_addr_len);
-  socket = AfterSocketAccepted(socket);
-
-
-  char host_buf[NI_MAXHOST];
-  char port_buf[NI_MAXSERV];
-
-  int res = getnameinfo (&client_addr, client_addr_len,
-                         host_buf, sizeof host_buf,
-                         port_buf, sizeof port_buf,
-                         NI_NUMERICHOST | NI_NUMERICSERV);
-  if(res != 0)
-    DLOG(error, "Connection::Accept getnameinfo fail");
-
-  if(socket < 0) {
-    DLOG(error, "Connection::Accept fail");
-    return client;
+void Connection::Accept(int listen_soc) {
+  std::weak_ptr<SocketObject> sockw;
+  auto it = _sockets.find(listen_soc);
+  if(it != _sockets.end()) {
+    sockw = it->second;
   }
 
-  client.reset(new Client(std::string(host_buf), std::stoi(std::string(port_buf))));
-  AddClient(socket, client);
-  return client;
+  if(auto server = sockw.lock()) { 
+    std::shared_ptr<Client> client;
+
+    struct sockaddr client_addr;
+    socklen_t client_addr_len = sizeof client_addr;
+
+    int socket = accept(listen_soc, &client_addr, &client_addr_len);
+    if(socket < 0) {
+      DLOG(warn, "Connection::Accept fail");
+      return;
+    }
+    socket = AfterSocketAccepted(socket);
+    if(socket < 0) {
+      DLOG(warn, "Connection::AfterSocketAccepted fail");
+      return;
+    }
+
+    char host_buf[NI_MAXHOST];
+    char port_buf[NI_MAXSERV];
+
+    int res = getnameinfo (&client_addr, client_addr_len,
+                           host_buf, sizeof host_buf,
+                           port_buf, sizeof port_buf,
+                           NI_NUMERICHOST | NI_NUMERICSERV);
+    if(res != 0)
+      DLOG(error, "Connection::Accept getnameinfo fail");
+
+
+    client.reset(new Client(std::string(host_buf), std::stoi(std::string(port_buf))));
+    AddSocket(socket, client);
+    server->OnClientConnected(client);
+  }
+  else {
+    Close(listen_soc);
+  }
 }
 
 int Connection::AfterSocketAccepted(int soc) {
@@ -266,7 +286,7 @@ void Connection::Stop() {
   _run_thread.Stop();
 }
 
-void Connection::AddClient(int socket, std::weak_ptr<Client> client) {
+void Connection::AddSocket(int socket, std::weak_ptr<SocketObject> client) {
   std::lock_guard<std::mutex> lock(_client_mutex);
   _sockets.insert(std::make_pair(socket, client));
 }
@@ -274,7 +294,8 @@ void Connection::AddClient(int socket, std::weak_ptr<Client> client) {
 void Connection::PerformSelect() {
 
   int max_fd = -1;
-  std::vector<std::pair<Data, std::weak_ptr<Client> > > results;
+  std::vector<std::pair<Data, std::weak_ptr<SocketObject> > > results;
+  std::vector<int> accepts;
   fd_set rfds, wfds;
   FD_ZERO(&rfds);
   FD_ZERO(&wfds);
@@ -284,9 +305,9 @@ void Connection::PerformSelect() {
   auto it_end = _sockets.end();
   while(it != it_end) {
     if(auto client = it->second.lock()) {
-      if(client->IsStarted()) {
+      if(client->IsActive()) {
         FD_SET(it->first, &rfds);
-        if(client->MsgQueueSize())
+        if(client->NeedsWrite())
           FD_SET(it->first, &wfds);
 
         if(it->first > max_fd)
@@ -315,14 +336,21 @@ void Connection::PerformSelect() {
     it = _sockets.begin();
     while(it != it_end) {
       if(FD_ISSET(it->first, &rfds)) {
-        Data data = Read(it->first);
-        results.push_back(std::make_pair(data, it->second));
+        if(auto client = it->second.lock()) {
+          if(!client->IsServerSocket()) {
+            Data data = Read(it->first);
+            results.push_back(std::make_pair(data, it->second));
+          }
+          else {
+            accepts.push_back(it->first);
+          }
+        }
       }
       if(FD_ISSET(it->first, &wfds)) {
         if(auto client = it->second.lock()) {
-          while(auto msg = client->RemoveMsg()) {
+          while(auto msg = client->GetNextMsg()) {
             bool ok = Write(it->first, msg);
-            client->OnWrite(msg, ok);
+            client->OnMsgWrite(msg, ok);
           }
         }
       }
@@ -337,7 +365,11 @@ void Connection::PerformSelect() {
 
   for(auto pair : results) {
     if(auto client = pair.second.lock())
-      client->OnRead(pair.first);
+      client->OnDataRead(pair.first);
+  }
+
+  for(auto socket : accepts) {
+    Accept(socket);
   }
 }
 
