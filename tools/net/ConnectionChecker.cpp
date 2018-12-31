@@ -60,6 +60,12 @@ void ConnectionChecker::Init() {
   _alive_check.Run(shared_from_this());
 }
 
+void ConnectionChecker::Reset() {
+  DLOG(info, "ConnectionChecker: Reset");
+  _current_client.reset();
+  _state = NOT_CONNECTED;
+}
+
 void ConnectionChecker::SetState(ConnectionState new_state) {
   if(_state != new_state) {
     if(auto keeper = _keeper.lock()) {

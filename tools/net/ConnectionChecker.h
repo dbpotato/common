@@ -55,6 +55,7 @@ public:
   ~ConnectionChecker();
   void Init();
   void Wake();
+  void Reset();
   void OnThreadStarted(int thread_id) override;
 
 protected :
