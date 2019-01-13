@@ -110,5 +110,5 @@ static NoSPDLogger* log(){
 #ifdef ENABLE_DEBUG_LOGGER
   #define DLOG(type, format, ...) log()->type(format, ##__VA_ARGS__)
 #else
-  #define DLOG(...) {}
+  #define DLOG(...) do {} while(0)
 #endif
