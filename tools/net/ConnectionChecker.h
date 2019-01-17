@@ -59,7 +59,6 @@ public:
   void OnThreadStarted(int thread_id) override;
 
 protected :
-  void DoConnectionCheck();
   void TryConnect();
   void SetState(ConnectionState new_state);
   std::weak_ptr<ConnectionKeeper> _keeper;
@@ -68,7 +67,6 @@ protected :
   size_t _check_interval_in_sec;
   std::string _server_url;
   int _server_port;
-  std::atomic<time_t> _last_alive;
   std::atomic<ConnectionState> _state;
   std::shared_ptr<Client> _current_client;
 };

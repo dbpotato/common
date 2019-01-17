@@ -32,11 +32,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <chrono>
 #include <thread>
 
-
-time_t CurrentTime() {
-  return std::chrono::system_clock::to_time_t( std::chrono::system_clock::now());
-}
-
 ConnectionChecker::ConnectionChecker(std::weak_ptr<ConnectionKeeper> keeper,
                   std::shared_ptr<Connection> connection,
                   size_t check_interval_in_sec,
@@ -47,7 +42,6 @@ ConnectionChecker::ConnectionChecker(std::weak_ptr<ConnectionKeeper> keeper,
   , _check_interval_in_sec(check_interval_in_sec)
   , _server_url(server_url)
   , _server_port(server_port)
-  , _last_alive(0)
   , _state(NOT_CONNECTED) {
 }
 
@@ -93,14 +87,6 @@ void ConnectionChecker::SetState(ConnectionState new_state) {
 
 void ConnectionChecker::OnThreadStarted(int id){
   while(_alive_check.ShouldRun()) {
-    DoConnectionCheck();
-    std::this_thread::sleep_for(std::chrono::seconds(_check_interval_in_sec));
-  }
-}
-
-void ConnectionChecker::DoConnectionCheck() {
-  time_t time = CurrentTime();
-  if(time > _last_alive + (time_t)_check_interval_in_sec) {
     switch (_state) {
       case NOT_CONNECTED:
       case MAYBE_CONNECTED:
@@ -112,6 +98,7 @@ void ConnectionChecker::DoConnectionCheck() {
       default:
         break;
     }
+    std::this_thread::sleep_for(std::chrono::seconds(_check_interval_in_sec));
   }
 }
 
@@ -126,6 +113,5 @@ void ConnectionChecker::TryConnect() {
 }
 
 void ConnectionChecker::Wake() {
-  _last_alive = CurrentTime();
   SetState(CONNECTED);
 }
