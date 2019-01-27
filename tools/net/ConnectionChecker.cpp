@@ -103,12 +103,17 @@ void ConnectionChecker::OnThreadStarted(int id){
 }
 
 void ConnectionChecker::TryConnect() {
-  _current_client = _connection->CreateClient(_server_port, _server_url);
-  if(_current_client) {
-    SetState(CONNECTED);
-  }
-  else {
-    SetState(NOT_CONNECTED);
+  if(auto keeper = _keeper.lock()) {
+    if(_current_client) {
+      _current_client.reset();
+      SetState(NOT_CONNECTED);
+    }
+
+    _current_client = _connection->CreateClient(_server_port, _server_url);
+
+    if(_current_client) {
+      SetState(CONNECTED);
+    }
   }
 }
 
