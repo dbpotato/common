@@ -39,15 +39,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/signal.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <errno.h>
 
 const int SOC_LISTEN = 256;
 const int SOC_READ_BUFF_SIZE = 2048;
-const int READ_WRITE_IDDLE_TIME = 25 * 1000; //microseconds
+const int READ_WRITE_IDDLE_TIME_IN_MS = 25;
+
+const int CONNECT_RETRY_DELAY_IN_MS = 1;
+const double CONNECT_TIMEOUT_IN_MS = 300.0;
 
 timeval cn_timeout() {
   struct timeval timeout;
   timeout.tv_sec = 0;
-  timeout.tv_usec = READ_WRITE_IDDLE_TIME;
+  timeout.tv_usec = READ_WRITE_IDDLE_TIME_IN_MS * 1000;
   return timeout;
 }
 
@@ -118,11 +122,14 @@ int Connection::CreateSocket(int port, const std::string& host, std::string& out
     if (sfd == -1)
       continue;
 
+    fcntl(sfd, F_SETFL, O_NONBLOCK);
+
     if(!is_server_socket) {
-      if(connect(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+      int connect_res = SyncConnect(sfd,rp);
+      if(!connect_res)
         break;
-      else
-        DLOG(warn, "Connection::CreateSocket connect fail");
+      else if(connect_res == -1)
+        DLOG(warn, "Connection::CreateSocket connect fail : {}", strerror(errno));
     }
     else {
       int reuse = 1;
@@ -154,9 +161,6 @@ int Connection::CreateSocket(int port, const std::string& host, std::string& out
     DLOG(error, "Connection::CreateSocket fail");
     return sfd;
   }
-
-  if(is_server_socket)
-    fcntl(sfd, F_SETFL, O_NONBLOCK);
 
   return AfterSocketCreated(sfd, is_server_socket);
 }
@@ -271,7 +275,6 @@ bool Connection::Write(int soc, std::shared_ptr<Message> msg) {
   return true;
 }
 
-
 void Connection::Init() {
   _run_thread.Run(shared_from_this(), 1);
 }
@@ -284,6 +287,30 @@ void Connection::OnThreadStarted(int thread_id) {
 
 void Connection::Stop() {
   _run_thread.Stop();
+}
+
+int Connection::SyncConnect(int sfd, addrinfo* addr_info) {
+  int res = 0;
+  double time_passed = 0.0;
+
+  auto start = std::chrono::system_clock::now();
+
+  do {
+    if(res)
+      std::this_thread::sleep_for(std::chrono::milliseconds(CONNECT_RETRY_DELAY_IN_MS));
+    res = connect(sfd, addr_info->ai_addr, addr_info->ai_addrlen);
+    time_passed = std::chrono::duration<double, std::milli>(std::chrono::system_clock::now() - start).count();
+  }
+  while((res != 0) &&
+        ((errno == EINPROGRESS) || (errno ==EALREADY)) &&
+        (time_passed < CONNECT_TIMEOUT_IN_MS));
+
+  if((res != 0) && (time_passed > CONNECT_TIMEOUT_IN_MS)) {
+    DLOG(warn, "Connection : connect timed out");
+    return -2;
+  }
+
+  return res;
 }
 
 void Connection::AddSocket(int socket, std::weak_ptr<SocketObject> client) {
@@ -324,7 +351,7 @@ void Connection::PerformSelect() {
   _client_mutex.unlock();
 
   if(max_fd == -1) {
-    usleep(READ_WRITE_IDDLE_TIME);
+    std::this_thread::sleep_for(std::chrono::milliseconds(READ_WRITE_IDDLE_TIME_IN_MS));
     return;
   }
 
@@ -358,7 +385,7 @@ void Connection::PerformSelect() {
     }
   }
   else {
-    usleep(READ_WRITE_IDDLE_TIME);
+    std::this_thread::sleep_for(std::chrono::milliseconds(READ_WRITE_IDDLE_TIME_IN_MS));
     DLOG(error, "Connection : select failed with err : {}", res);
   }
   _client_mutex.unlock();

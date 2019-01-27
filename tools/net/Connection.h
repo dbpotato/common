@@ -34,6 +34,7 @@ class Message;
 class SocketObject;
 class Client;
 class Server;
+struct addrinfo;
 
 class Data {
 public:
@@ -69,6 +70,7 @@ protected :
   virtual int SocketRead(int soc, void* dest, int dest_lenght);
   virtual int SocketWrite(int soc, void* buffer, int size);
 
+  int SyncConnect(int sfd, addrinfo* addr_info);
   void AddSocket(int socket, std::weak_ptr<SocketObject> client);
   void PerformSelect();
   void ThreadCheck();
