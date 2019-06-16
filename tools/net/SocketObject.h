@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -32,14 +32,14 @@ class Message;
 class SocketObject : public std::enable_shared_from_this<SocketObject> {
 
 public:
- SocketObject(bool is_server_socket);
- virtual bool NeedsWrite();
- virtual std::shared_ptr<Message> GetNextMsg();
+ SocketObject(size_t raw_handle, bool is_server_socket);
  virtual void OnMsgWrite(std::shared_ptr<Message> msg, bool status);
  virtual void OnDataRead(Data& data);
  virtual void OnClientConnected(std::shared_ptr<Client> client);
  virtual bool IsActive();
  bool IsServerSocket();
+ size_t Handle();
 private:
+ size_t _raw_handle;
  bool _is_server_socket;
 };

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -31,6 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class Message;
 class Client;
+class Connection;
 
 class ClientManager {
 public:
@@ -45,7 +46,6 @@ friend std::shared_ptr<Client> Connection::CreateClient(int, const std::string&)
 friend void Connection::Accept(int);
 
 public:
-  ~Client();
   void Start(std::weak_ptr<ClientManager> mgr, bool is_raw = false);
   void Send(std::shared_ptr<Message> msg);
   int GetId();
@@ -55,8 +55,6 @@ public:
   int GetPort();
   std::shared_ptr<Client> SharedPtr();
 
-  bool NeedsWrite() override;
-  std::shared_ptr<Message> GetNextMsg() override;
   void OnMsgWrite(std::shared_ptr<Message> msg, bool status) override;
   void OnDataRead(Data& data) override;
   bool IsActive() override;
@@ -65,15 +63,18 @@ protected:
   static uint32_t NextId();
   int _id;
   std::weak_ptr<ClientManager> _manager;
-  std::mutex _mutex;
-  std::vector<std::shared_ptr<Message> > _msg_query;
   bool _is_raw;
   std::atomic_bool _is_started;
   MessageBuilder _msg_builder;
   static std::atomic<uint32_t> _id_counter;
 private:
-  Client(const std::string& ip = "", int port = -1, const std::string& url = "");
+  Client(size_t raw_handle,
+         std::shared_ptr<Connection> connection,
+         const std::string& ip = {},
+         int port = -1,
+         const std::string& url = {});
   std::string _url;
   std::string _ip;
   int _port;
+  std::shared_ptr<Connection> _connection;
 };

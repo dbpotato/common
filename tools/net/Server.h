@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -44,6 +44,6 @@ public:
 protected:
   std::weak_ptr<ServerManager> _manager;
 private:
-  Server();
+  Server(size_t raw_handle);
   bool _started;
 };

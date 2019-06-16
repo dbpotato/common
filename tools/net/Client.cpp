@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Client.h"
 #include "Message.h"
 #include "Logger.h"
+#include "Connection.h"
 
 #include <limits>
 
@@ -34,18 +35,19 @@ uint32_t Client::NextId() {
   return ++_id_counter;
 }
 
-Client::Client(const std::string& ip, int port, const std::string& url)
-    : SocketObject(false)
+Client::Client(size_t raw_handle,
+               std::shared_ptr<Connection> connection,
+               const std::string& ip,
+               int port,
+               const std::string& url)
+    : SocketObject(raw_handle, false)
     , _id(NextId())
     , _is_raw(false)
     , _is_started(false)
     , _url(url)
     , _ip(ip)
-    , _port(port) {
-}
-
-Client::~Client() {
-  DLOG(debug, "Client: {} destroyed", _id);
+    , _port(port)
+    , _connection(connection){
 }
 
 int Client::GetId() {
@@ -65,8 +67,7 @@ int Client::GetPort() {
 }
 
 void Client::Send(std::shared_ptr<Message> msg) {
-  std::lock_guard<std::mutex> lock(_mutex);
-  _msg_query.push_back(msg);
+  _connection->SendMsg(shared_from_this(), msg);
 }
 
 void Client::Start(std::weak_ptr<ClientManager> mgr, bool is_raw) {
@@ -81,24 +82,6 @@ void Client::Start(std::weak_ptr<ClientManager> mgr, bool is_raw) {
 
 std::shared_ptr<Client> Client::SharedPtr() {
   return std::static_pointer_cast<Client>(shared_from_this());
-}
-
-
-bool Client::NeedsWrite() {
-  std::lock_guard<std::mutex> lock(_mutex);
-  return _msg_query.size() > 0;
-}
-
-std::shared_ptr<Message> Client::GetNextMsg() {
-  std::lock_guard<std::mutex> lock(_mutex);
-  std::shared_ptr<Message> msg;
-
-  if(!_msg_query.empty()){
-    msg = _msg_query.front();
-    _msg_query.erase(_msg_query.begin());
-  }
-
-  return msg;
 }
 
 void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {

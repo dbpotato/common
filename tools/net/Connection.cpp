@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -43,17 +43,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 const int SOC_LISTEN = 256;
 const int SOC_READ_BUFF_SIZE = 2048;
-const int READ_WRITE_IDDLE_TIME_IN_MS = 25;
+const int TRANSPORTER_IDDLE_SLEEP_IN_MS = 25;
+const int TRANSPORTER_ACTIVE_SLEEP_IN_US = 100;
 
 const int CONNECT_RETRY_DELAY_IN_MS = 1;
 const double CONNECT_TIMEOUT_IN_MS = 300.0;
 
-timeval cn_timeout() {
-  struct timeval timeout;
-  timeout.tv_sec = 0;
-  timeout.tv_usec = READ_WRITE_IDDLE_TIME_IN_MS * 1000;
-  return timeout;
-}
 
 Data::Data()
   : _size(0) {
@@ -75,7 +70,7 @@ std::shared_ptr<Client> Connection::CreateClient(int port, const std::string& ho
   if(socket < 0)
     return client;
 
-  client.reset(new Client(ip, port, host));
+  client.reset(new Client(socket, shared_from_this(), ip, port, host));
   AddSocket(socket, client);
   return client;
 }
@@ -88,7 +83,7 @@ std::shared_ptr<Server> Connection::CreateServer(int port) {
   if(socket < 0)
     return server;
 
-  server.reset(new Server());
+  server.reset(new Server(socket));
   AddSocket(socket, server);
   return server;
 }
@@ -204,7 +199,10 @@ void Connection::Accept(int listen_soc) {
       DLOG(error, "Connection::Accept getnameinfo fail");
 
 
-    client.reset(new Client(std::string(host_buf), std::stoi(std::string(port_buf))));
+    client.reset(new Client(socket,
+                            shared_from_this(),
+                            std::string(host_buf),
+                            std::stoi(std::string(port_buf))));
     AddSocket(socket, client);
     server->OnClientConnected(client);
   }
@@ -217,7 +215,7 @@ int Connection::AfterSocketAccepted(int soc) {
   return soc;
 }
 
-void Connection::Close(int soc){
+void Connection::Close(int soc) {
   close(soc);
 }
 
@@ -276,17 +274,25 @@ bool Connection::Write(int soc, std::shared_ptr<Message> msg) {
 }
 
 void Connection::Init() {
+  _transporter.Init(shared_from_this());
   _run_thread.Run(shared_from_this(), 1);
 }
 
 void Connection::OnThreadStarted(int thread_id) {
   while(_run_thread.ShouldRun()) {
-    PerformSelect();
+    if(CallTransporter())
+      std::this_thread::sleep_for(std::chrono::microseconds(TRANSPORTER_ACTIVE_SLEEP_IN_US));
+    else
+      std::this_thread::sleep_for(std::chrono::milliseconds(TRANSPORTER_IDDLE_SLEEP_IN_MS));
   }
 }
 
 void Connection::Stop() {
   _run_thread.Stop();
+}
+
+void Connection::SendMsg(std::shared_ptr<SocketObject> obj, std::shared_ptr<Message> msg) {
+  _transporter.AddSendRequest(SendRequest(obj, msg));
 }
 
 int Connection::SyncConnect(int sfd, addrinfo* addr_info) {
@@ -318,86 +324,32 @@ void Connection::AddSocket(int socket, std::weak_ptr<SocketObject> client) {
   _sockets.insert(std::make_pair(socket, client));
 }
 
-void Connection::PerformSelect() {
 
-  int max_fd = -1;
-  std::vector<std::pair<Data, std::weak_ptr<SocketObject> > > results;
-  std::vector<int> accepts;
-  fd_set rfds, wfds;
-  FD_ZERO(&rfds);
-  FD_ZERO(&wfds);
-  _client_mutex.lock();
+bool Connection::CallTransporter() {
 
-  auto it = _sockets.begin();
-  auto it_end = _sockets.end();
-  while(it != it_end) {
-    if(auto client = it->second.lock()) {
-      if(client->IsActive()) {
-        FD_SET(it->first, &rfds);
-        if(client->NeedsWrite())
-          FD_SET(it->first, &wfds);
+  std::vector<std::shared_ptr<SocketObject> > objects;
+  {
+    std::lock_guard<std::mutex> lock(_client_mutex);
 
-        if(it->first > max_fd)
-          max_fd = it->first;
-      }
-      ++it;
-    }
-    else {
-      Close(it->first);
-      it = _sockets.erase(it);
-    }
-  }
+    auto it = _sockets.begin();
+    auto it_end = _sockets.end();
 
-  _client_mutex.unlock();
-
-  if(max_fd == -1) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(READ_WRITE_IDDLE_TIME_IN_MS));
-    return;
-  }
-
-  timeval timeout = cn_timeout();
-  int res = select(max_fd +1, &rfds, &wfds, NULL, &timeout);
-
-  _client_mutex.lock();
-  if(res >= 0 ) {
-    it = _sockets.begin();
     while(it != it_end) {
-      if(FD_ISSET(it->first, &rfds)) {
-        if(auto client = it->second.lock()) {
-          if(!client->IsServerSocket()) {
-            Data data = Read(it->first);
-            results.push_back(std::make_pair(data, it->second));
-          }
-          else {
-            accepts.push_back(it->first);
-          }
-        }
+      if(auto obj = it->second.lock()) {
+        objects.push_back(obj);
+        ++it;
       }
-      if(FD_ISSET(it->first, &wfds)) {
-        if(auto client = it->second.lock()) {
-          while(auto msg = client->GetNextMsg()) {
-            bool ok = Write(it->first, msg);
-            client->OnMsgWrite(msg, ok);
-          }
-        }
+      else {
+        Close(it->first);
+        it = _sockets.erase(it);
       }
-      ++it;
     }
   }
-  else {
-    std::this_thread::sleep_for(std::chrono::milliseconds(READ_WRITE_IDDLE_TIME_IN_MS));
-    DLOG(error, "Connection : select failed with err : {}", res);
-  }
-  _client_mutex.unlock();
 
-  for(auto pair : results) {
-    if(auto client = pair.second.lock())
-      client->OnDataRead(pair.first);
-  }
+  if(!objects.size())
+    return false;
 
-  for(auto socket : accepts) {
-    Accept(socket);
-  }
+  return _transporter.RunOnce(objects);
 }
 
 void Connection::ThreadCheck() {

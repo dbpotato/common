@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,19 +23,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "SocketObject.h"
 
-SocketObject::SocketObject(bool is_server_socket)
-    : _is_server_socket(is_server_socket) {
+SocketObject::SocketObject(size_t raw_handle, bool is_server_socket)
+    : _raw_handle(raw_handle)
+    , _is_server_socket(is_server_socket) {
 }
 
 void SocketObject::OnDataRead(Data& data) {
-}
-
-bool SocketObject::NeedsWrite() {
-  return false;
-}
-
-std::shared_ptr<Message> SocketObject::GetNextMsg() {
-  return std::shared_ptr<Message>();
 }
 
 void SocketObject::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
@@ -50,4 +43,8 @@ bool SocketObject::IsActive() {
 
 bool SocketObject::IsServerSocket() {
   return _is_server_socket;
+}
+
+size_t SocketObject::Handle() {
+  return _raw_handle;
 }
