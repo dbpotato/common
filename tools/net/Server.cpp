@@ -31,7 +31,7 @@ Server::Server(size_t raw_handle)
 
 bool Server::Init(std::weak_ptr<ServerManager> mgr) {
   if(_started) {
-    log()->error("Server already started");
+    DLOG(error, "Server already started");
     return false;
   }
   _manager = mgr;

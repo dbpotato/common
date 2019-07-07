@@ -28,10 +28,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <limits>
 
+
+
 std::atomic<uint32_t> Client::_id_counter(0);
+
 uint32_t Client::NextId() {
   if(_id_counter == std::numeric_limits<uint32_t>::max())
-    log()->error("Client's id counter overflow");
+    DLOG(error, "Client's id counter overflow");
   return ++_id_counter;
 }
 
@@ -77,7 +80,7 @@ void Client::Start(std::weak_ptr<ClientManager> mgr, bool is_raw) {
     _is_started = true;
   }
   else
-    log()->error("Client::Start - already started,id : {}", _id);
+    DLOG(error, "Client::Start - already started,id : {}", _id);
 }
 
 std::shared_ptr<Client> Client::SharedPtr() {

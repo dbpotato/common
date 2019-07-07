@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Message.h"
 
+#include <string>
 #include <cstring>
 #include <unistd.h>
 

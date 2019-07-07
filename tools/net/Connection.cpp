@@ -144,7 +144,7 @@ int Connection::CreateSocket(int port, const std::string& host, std::string& out
 
   if(rp) {
     char ipstr[INET_ADDRSTRLEN];
-    struct sockaddr_in* ipv = (struct sockaddr_in *)rp->ai_addr;
+    struct sockaddr_in* ipv = reinterpret_cast<struct sockaddr_in*>(rp->ai_addr);
     struct in_addr* addr = &(ipv->sin_addr);
     inet_ntop(rp->ai_family, addr, ipstr, sizeof ipstr);
     out_ip = std::string(ipstr);
@@ -354,5 +354,5 @@ bool Connection::CallTransporter() {
 
 void Connection::ThreadCheck() {
   if(!_run_thread.IsRunning())
-    log()->warn("Connection was not intialized");
+    DLOG(warn, "Connection was not intialized");
 }

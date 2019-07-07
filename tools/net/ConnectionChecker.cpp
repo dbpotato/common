@@ -87,7 +87,7 @@ void ConnectionChecker::SetState(ConnectionState new_state) {
 
 void ConnectionChecker::OnThreadStarted(int id){
   while(_alive_check.ShouldRun()) {
-    switch (_state) {
+    switch (_state.load()) {
       case NOT_CONNECTED:
       case MAYBE_CONNECTED:
         TryConnect();
