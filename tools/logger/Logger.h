@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -27,21 +27,22 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <spdlog/spdlog.h>
 
+static const char* DEFAULT_LOGGER_PATTERN = "[%H:%M:%S:%e] [%t] [%l] %v";
+
 class func_sink : public spdlog::sinks::sink {
 public:
   func_sink():
       _log_func(nullptr),
       _log_func_arg(nullptr) {
   }
+
   virtual ~func_sink(){;}
-  static std::shared_ptr<func_sink> create() {
-    std::shared_ptr<func_sink> sink = std::make_shared<func_sink>();
-    return sink;
-  }
+
   void SetLogFunc(void(*func)(spdlog::level::level_enum, const std::string&, void*), void* arg){
     _log_func = func;
     _log_func_arg = arg;
   }
+
   void log(const spdlog::details::log_msg& msg) override {
     std::lock_guard<std::mutex> lock(_mutex);
     if(_log_func) {
@@ -71,40 +72,75 @@ public:
     static Logger instance;
     return instance;
   }
-  void SetLogFunc(void(*func)(spdlog::level::level_enum, const std::string&, void*), int id_looger, void* log_func_arg) {
-    auto sink = std::static_pointer_cast<func_sink>(GetLogger(id_looger)->sinks()[0]);
+
+  void SetLogFunc(void(*func)(spdlog::level::level_enum,
+                              const std::string&, void*),
+                              int id_looger,
+                              void* log_func_arg) {
+    std::shared_ptr<func_sink> sink = GetSink(id_looger);
     sink->SetLogFunc(func, log_func_arg);
   }
-  std::shared_ptr<spdlog::logger> GetLogger(int id) {
-    if(!id)
-      return _default_logger;
 
-    auto logger = spdlog::details::registry::instance().get(std::to_string(id));
+  void SetPattern(const char* pattern, int id_looger = 0) {
+    auto logger = GetLogger(id_looger);
+    logger->set_pattern(pattern);
+  }
+
+  bool Init(int id_looger, std::shared_ptr<spdlog::sinks::sink> additional_sink = nullptr) {
+    if(InternalGet(id_looger))
+      return false;
+
+    InternalInitialize(id_looger, additional_sink);
+    return true;
+  }
+
+  std::shared_ptr<spdlog::logger> GetLogger(int id) {
+    auto logger = InternalGet(id);
     if(logger)
       return logger;
 
-    logger = spdlog::details::registry::instance().create(std::to_string(id), func_sink::create());
+    return InternalInitialize(id);
+  }
+
+  std::shared_ptr<func_sink> GetSink(int logger_id) {
+    auto logger = GetLogger(logger_id);
+    return std::static_pointer_cast<func_sink>(logger->sinks()[0]);
+  }
+
+protected:
+  Logger(){}
+  Logger(const Logger&){}
+  Logger(const Logger&&){}
+
+  std::shared_ptr<spdlog::logger> InternalInitialize(int id,
+                                             std::shared_ptr<spdlog::sinks::sink> additional_sink = nullptr) {
+    auto sink = std::make_shared<func_sink>();
+    std::shared_ptr<spdlog::logger> logger;
+
+    if(additional_sink)
+      logger = spdlog::details::registry::instance().create(std::to_string(id), {sink, additional_sink});
+    else
+      logger = spdlog::details::registry::instance().create(std::to_string(id), sink);
+
+    logger->set_pattern(DEFAULT_LOGGER_PATTERN);
+    if(!id)
+      _default_logger = logger;
+
     return logger;
   }
-protected:
-  Logger() {
-    _default_logger = spdlog::details::registry::instance().create("0", func_sink::create());
-    _default_logger->set_pattern("[%H:%M:%S:%e] [%t] [%l] %v");
-#ifdef ENABLE_DEBUG_LOGGER
-    _default_logger->set_level(spdlog::level::debug);
-#endif
+
+  std::shared_ptr<spdlog::logger> InternalGet(int id) {
+    if(!id)
+      return _default_logger;
+    else
+      return spdlog::details::registry::instance().get(std::to_string(id));
   }
+
   std::shared_ptr<spdlog::logger> _default_logger;
 };
 
 static std::shared_ptr<spdlog::logger> log(int id = 0) {
   return Logger::Instance().GetLogger(id);
-}
-
-static void set_log_func(void(*func)(spdlog::level::level_enum, const std::string&, void*),
-                         int id_looger = 0,
-                         void* log_func_arg = nullptr) {
-  Logger::Instance().SetLogFunc(func, id_looger, log_func_arg);
 }
 
 #else
