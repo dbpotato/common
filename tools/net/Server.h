@@ -39,11 +39,11 @@ friend class std::shared_ptr<Server> Connection::CreateServer(int);
 
 public:
   bool Init(std::weak_ptr<ServerManager> mgr);
-  void OnClientConnected(std::shared_ptr<Client> client) override;
+  void OnClientConnected(std::shared_ptr<Client> client);
   bool IsActive() override;
 protected:
   std::weak_ptr<ServerManager> _manager;
 private:
-  Server(size_t raw_handle);
+  Server(size_t raw_handle, std::shared_ptr<Connection> connection);
   bool _started;
 };

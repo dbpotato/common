@@ -43,7 +43,7 @@ public:
 class Client : public SocketObject {
 
 friend std::shared_ptr<Client> Connection::CreateClient(int, const std::string&);
-friend void Connection::Accept(int);
+friend void Connection::Accept(std::shared_ptr<SocketObject>);
 
 public:
   void Start(std::weak_ptr<ClientManager> mgr, bool is_raw = false);
@@ -57,6 +57,7 @@ public:
 
   void OnMsgWrite(std::shared_ptr<Message> msg, bool status) override;
   void OnDataRead(Data& data) override;
+  void OnConnectionClosed() override;
   bool IsActive() override;
 
 protected:
@@ -76,5 +77,4 @@ private:
   std::string _url;
   std::string _ip;
   int _port;
-  std::shared_ptr<Connection> _connection;
 };

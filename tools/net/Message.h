@@ -33,6 +33,7 @@ class Message {
 public:
   uint8_t _type;
   uint32_t _size;
+  uint32_t _write_offset;
   std::shared_ptr<unsigned char> _data;
   bool _is_raw;
 

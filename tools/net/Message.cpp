@@ -31,6 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 Message::Message(uint32_t size, const void* data)
   : _type(0)
   , _size(size)
+  , _write_offset(0)
   , _is_raw(true) {
   _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
   std::memcpy(_data.get(), data, _size);
@@ -39,6 +40,7 @@ Message::Message(uint32_t size, const void* data)
 Message::Message(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t offset, bool copy)
   : _type(0)
   , _size(size)
+  , _write_offset(0)
   , _data(data)
   , _is_raw(true) {
   if(copy || offset) {
@@ -50,6 +52,7 @@ Message::Message(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t of
 Message::Message(const std::string& str)
   : _type(0)
   , _size(str.length())
+  , _write_offset(0)
   , _is_raw(true) {
   if(_size) {
     _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
@@ -60,6 +63,7 @@ Message::Message(const std::string& str)
 Message::Message(uint8_t type)
   : _type(type)
   , _size(0)
+  , _write_offset(0)
   , _is_raw(false) {
 }
 

@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "PosixThread.h"
 #include "Transporter.h"
+#include "SocketObject.h"
 
 #include <string>
 #include <map>
@@ -32,22 +33,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <mutex>
 
 class Message;
-class SocketObject;
+class SessionInfo;
 class Client;
 class Server;
 struct addrinfo;
 
-class Data {
-public:
-  Data();
-  uint32_t _size;
-  std::shared_ptr<unsigned char> _data;
-};
 
 class Connection : public std::enable_shared_from_this<Connection>
                  , public ThreadObject {
 
 friend bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >&);
+friend SocketObject::~SocketObject();
 
 public:
   Connection();
@@ -56,25 +52,25 @@ public:
   std::shared_ptr<Server> CreateServer(int port);
 
   void SendMsg(std::shared_ptr<SocketObject>, std::shared_ptr<Message> msg);
-  void Accept(int listen_soc);
+  void Accept(std::shared_ptr<SocketObject> obj);
 
   void Init();
   void Stop();
   void OnThreadStarted(int thread_id) override;
 
 protected :
-  virtual int AfterSocketCreated(int soc, bool listen_soc);
-  virtual int AfterSocketAccepted(int soc);
-  virtual int SocketRead(int soc, void* dest, int dest_lenght);
-  virtual int SocketWrite(int soc, void* buffer, int size);
-  virtual void Close(int soc);
+  virtual bool AfterSocketCreated(int socket, std::shared_ptr<SessionInfo>& session);
+  virtual bool AfterSocketAccepted(int socket, std::shared_ptr<SessionInfo>& session);
+  virtual bool SocketRead(std::shared_ptr<SocketObject> obj, void* dest, int dest_size, int& out_read_size);
+  virtual bool SocketWrite(std::shared_ptr<SocketObject> obj, void* buffer, int size, int& out_write_size);
+  virtual void Close(SocketObject* obj);
 
   int CreateSocket(int port,
                    const std::string& host,
                    std::string& out_ip,
                    bool is_server_socket = false);
-  Data Read(int soc);
-  bool Write(int soc, std::shared_ptr<Message>);
+  void Read(std::shared_ptr<SocketObject> obj);
+  bool Write(std::shared_ptr<SocketObject> obj, std::shared_ptr<Message>);
   int SyncConnect(int sfd, addrinfo* addr_info);
   void AddSocket(int socket, std::weak_ptr<SocketObject> client);
   bool CallTransporter();

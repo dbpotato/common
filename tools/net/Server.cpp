@@ -24,8 +24,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Server.h"
 #include "Logger.h"
 
-Server::Server(size_t raw_handle)
-    : SocketObject(raw_handle, true)
+Server::Server(size_t raw_handle, std::shared_ptr<Connection> connection)
+    : SocketObject(raw_handle, true, connection)
     , _started(false) {
 }
 

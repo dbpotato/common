@@ -43,14 +43,13 @@ Client::Client(size_t raw_handle,
                const std::string& ip,
                int port,
                const std::string& url)
-    : SocketObject(raw_handle, false)
+    : SocketObject(raw_handle, false, connection)
     , _id(NextId())
     , _is_raw(false)
     , _is_started(false)
     , _url(url)
     , _ip(ip)
-    , _port(port)
-    , _connection(connection){
+    , _port(port) {
 }
 
 int Client::GetId() {
@@ -93,13 +92,6 @@ void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
 }
 
 void Client::OnDataRead(Data& data) {
-  if(!data._size) {
-    if(auto manager = _manager.lock()) {
-      manager->OnClientClosed(SharedPtr());
-    }
-   return;
-  }
-
   if(!_is_raw) {
     std::vector<std::shared_ptr<Message> > msgs;
     _msg_builder.AddData(data, msgs);
@@ -114,6 +106,11 @@ void Client::OnDataRead(Data& data) {
     if(auto manager = _manager.lock())
       manager->OnClientRead(SharedPtr(), msg);
   }
+}
+
+void Client::OnConnectionClosed() {
+  if(auto manager = _manager.lock())
+    manager->OnClientClosed(SharedPtr());
 }
 
 bool Client::IsActive() {

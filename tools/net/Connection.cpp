@@ -50,10 +50,6 @@ const int CONNECT_RETRY_DELAY_IN_MS = 1;
 const double CONNECT_TIMEOUT_IN_MS = 300.0;
 
 
-Data::Data()
-  : _size(0) {
-}
-
 Connection::Connection()
     : _red_buff_lenght(SOC_READ_BUFF_SIZE) {
   signal(SIGPIPE, SIG_IGN);
@@ -65,12 +61,21 @@ Connection::~Connection() {
 std::shared_ptr<Client> Connection::CreateClient(int port, const std::string& host) {
   ThreadCheck();
   std::shared_ptr<Client> client;
+  std::shared_ptr<SessionInfo> session;
   std::string ip;
+
   int socket = CreateSocket(port, host, ip);
   if(socket < 0)
     return client;
 
+  if(!AfterSocketCreated(socket, session)) {
+    close(socket);
+    return client;
+  }
+
   client.reset(new Client(socket, shared_from_this(), ip, port, host));
+  client->SetSession(session);
+
   AddSocket(socket, client);
   return client;
 }
@@ -79,11 +84,11 @@ std::shared_ptr<Server> Connection::CreateServer(int port) {
   ThreadCheck();
   std::shared_ptr<Server> server;
   std::string ip;
-  int socket = CreateSocket(port, "", ip, true);
+  int socket = CreateSocket(port, {}, ip, true);
   if(socket < 0)
     return server;
 
-  server.reset(new Server(socket));
+  server.reset(new Server(socket, shared_from_this()));
   AddSocket(socket, server);
   return server;
 }
@@ -123,8 +128,12 @@ int Connection::CreateSocket(int port, const std::string& host, std::string& out
       int connect_res = SyncConnect(sfd,rp);
       if(!connect_res)
         break;
-      else if(connect_res == -1)
-        DLOG(warn, "Connection::CreateSocket connect fail : {}", strerror(errno));
+      else if(connect_res == -1) {
+        DLOG(warn, "Connection::CreateSocket connect fail : {}:{} : {}",
+             host,
+             port,
+             strerror(errno));
+      }
     }
     else {
       int reuse = 1;
@@ -157,120 +166,145 @@ int Connection::CreateSocket(int port, const std::string& host, std::string& out
     return sfd;
   }
 
-  return AfterSocketCreated(sfd, is_server_socket);
+  return sfd;
 }
 
-int Connection::AfterSocketCreated(int soc, bool listen_soc) {
-  return soc;
+bool Connection::AfterSocketCreated(int socket,
+                                    std::shared_ptr<SessionInfo>& session) {
+  return true;
 }
 
-void Connection::Accept(int listen_soc) {
-  std::weak_ptr<SocketObject> sockw;
-  auto it = _sockets.find(listen_soc);
-  if(it != _sockets.end()) {
-    sockw = it->second;
+void Connection::Accept(std::shared_ptr<SocketObject> obj) {
+  std::shared_ptr<Client> client;
+  std::shared_ptr<SessionInfo> session;
+  struct sockaddr client_addr;
+  socklen_t client_addr_len = sizeof client_addr;
+
+  std::shared_ptr<Server> server = std::static_pointer_cast<Server>(obj);
+
+  int socket = accept((int)server->Handle(), &client_addr, &client_addr_len);
+  if(socket < 0) {
+    DLOG(warn, "Connection::Accept fail");
+    return;
   }
 
-  if(auto server = sockw.lock()) { 
-    std::shared_ptr<Client> client;
-
-    struct sockaddr client_addr;
-    socklen_t client_addr_len = sizeof client_addr;
-
-    int socket = accept(listen_soc, &client_addr, &client_addr_len);
-    if(socket < 0) {
-      DLOG(warn, "Connection::Accept fail");
-      return;
-    }
-    socket = AfterSocketAccepted(socket);
-    if(socket < 0) {
-      DLOG(warn, "Connection::AfterSocketAccepted fail");
-      return;
-    }
-
-    char host_buf[NI_MAXHOST];
-    char port_buf[NI_MAXSERV];
-
-    int res = getnameinfo (&client_addr, client_addr_len,
-                           host_buf, sizeof host_buf,
-                           port_buf, sizeof port_buf,
-                           NI_NUMERICHOST | NI_NUMERICSERV);
-    if(res != 0)
-      DLOG(error, "Connection::Accept getnameinfo fail");
-
-
-    client.reset(new Client(socket,
-                            shared_from_this(),
-                            std::string(host_buf),
-                            std::stoi(std::string(port_buf))));
-    AddSocket(socket, client);
-    server->OnClientConnected(client);
+  if(!AfterSocketAccepted(socket, session)) {
+    DLOG(warn, "Connection::AfterSocketAccepted fail");
+    close(socket);
+    return;
   }
-  else {
-    Close(listen_soc);
-  }
+
+  char host_buf[NI_MAXHOST];
+  char port_buf[NI_MAXSERV];
+
+  int res = getnameinfo (&client_addr, client_addr_len,
+                         host_buf, sizeof host_buf,
+                         port_buf, sizeof port_buf,
+                         NI_NUMERICHOST | NI_NUMERICSERV);
+  if(res != 0)
+    DLOG(error, "Connection::Accept getnameinfo fail");
+
+
+  client.reset(new Client(socket,
+                          shared_from_this(),
+                          std::string(host_buf),
+                          std::stoi(std::string(port_buf))));
+  client->SetSession(session);
+
+  AddSocket(socket, client);
+  server->OnClientConnected(client);
 }
 
-int Connection::AfterSocketAccepted(int soc) {
-  return soc;
+bool Connection::AfterSocketAccepted(int socket, std::shared_ptr<SessionInfo>& session) {
+  return true;
 }
 
-void Connection::Close(int soc) {
-  close(soc);
+void Connection::Close(SocketObject* obj) {
+  close((int)obj->Handle());
 }
 
-Data Connection::Read(int soc) {
+void Connection::Read(std::shared_ptr<SocketObject> obj) {
   Data data;
   int read_len = 0;
   unsigned char buff[_red_buff_lenght];
 
-  read_len = SocketRead(soc, buff, _red_buff_lenght);
+  bool res = SocketRead(obj, buff, _red_buff_lenght, read_len);
 
-  if (read_len <= 0) {
-    return data;
+  if (!res) {
+    obj->OnConnectionClosed();
+    return;
   }
 
   if(read_len) {
-    std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len], std::default_delete<unsigned char[]>());
+    std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len],
+                                             std::default_delete<unsigned char[]>());
     std::memcpy(data_sptr.get(), (void*)(buff), read_len);
     data._size = read_len;
     data._data = data_sptr;
+    obj->OnDataRead(data);
   }
-
-  return data;
 }
 
-int Connection::SocketRead(int soc, void* dest, int dest_lenght) {
-  return read(soc, dest, dest_lenght);
+bool Connection::SocketRead(std::shared_ptr<SocketObject> obj, void* dest, int dest_size, int& out_dest_write) {
+  out_dest_write = read((int)obj->Handle(), dest, dest_size);
+  return out_dest_write > 0;
 }
 
-int Connection::SocketWrite(int soc, void* buffer, int size) {
-  return write(soc, buffer, size);
+bool Connection::SocketWrite(std::shared_ptr<SocketObject> obj, void* buffer, int size, int& out_write_size) {
+  out_write_size = write((int)obj->Handle(), buffer, size);
+  return out_write_size > 0;
 }
 
-bool Connection::Write(int soc, std::shared_ptr<Message> msg) {
+bool Connection::Write(std::shared_ptr<SocketObject> obj, std::shared_ptr<Message> msg) {
+  bool failed = false;
+  int write_size = 0;
+  bool completed = false;
 
-  ssize_t result = 0;
+  uint32_t total_size = msg->_is_raw ? msg-> _size : msg-> _size + MESSAGE_HEADER_LENGTH;
 
   if(!msg->_is_raw) {
-    uint8_t header[MESSAGE_HEADER_LENGTH];
-    std::memcpy(header, &msg->_type, sizeof(msg->_type));
-    std::memcpy(header + sizeof(msg->_type), &msg->_size, sizeof(msg->_size));
+    if(msg->_write_offset < MESSAGE_HEADER_LENGTH) {
+      uint8_t header[MESSAGE_HEADER_LENGTH];
+      std::memcpy(header, &msg->_type, sizeof(msg->_type));
+      std::memcpy(header + sizeof(msg->_type), &msg->_size, sizeof(msg->_size));
 
-    result = SocketWrite(soc, header, MESSAGE_HEADER_LENGTH);
-    if(result != MESSAGE_HEADER_LENGTH) {
-      return false;
+      if(SocketWrite(obj,
+                     header + msg->_write_offset,
+                     MESSAGE_HEADER_LENGTH - msg->_write_offset,
+                     write_size)) {
+        msg->_write_offset += write_size;
+        if(msg->_write_offset < MESSAGE_HEADER_LENGTH) {
+          return completed;
+        }
+      }
+      else {
+        failed = true;
+      }
     }
   }
 
-  if(msg->_size) {
-    result = SocketWrite(soc, msg->_data.get(), msg->_size);
-    if(result !=  msg->_size) {
-      return false;
+  if(msg->_size && !failed) {
+    uint32_t offset = msg->_is_raw ? msg-> _write_offset : msg-> _write_offset - MESSAGE_HEADER_LENGTH;
+    if(SocketWrite(obj,
+                   msg->_data.get() + offset,
+                   msg->_size - offset,
+                   write_size)) {
+      msg->_write_offset += write_size;
+      DLOG(error, "Connection::Write {}", write_size);
+    }
+    else {
+      failed = true;
     }
   }
 
-  return true;
+  if((msg->_write_offset == total_size) || failed )
+    completed = true;
+
+  if(completed)
+    obj->OnMsgWrite(msg, !failed);
+
+
+  return completed;
 }
 
 void Connection::Init() {
@@ -340,7 +374,6 @@ bool Connection::CallTransporter() {
         ++it;
       }
       else {
-        Close(it->first);
         it = _sockets.erase(it);
       }
     }

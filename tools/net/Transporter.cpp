@@ -22,14 +22,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Transporter.h"
+#include "Connection.h"
 #include "Message.h"
 #include "SocketObject.h"
 #include "Logger.h"
 
+
 const int SELECT_TIMEOUT_IN_MS = 250;
 
 
-Transporter::Transporter(){
+Transporter::Transporter() {
 }
 
 void Transporter::Init(std::shared_ptr<Connection> connection) {
@@ -37,7 +39,7 @@ void Transporter::Init(std::shared_ptr<Connection> connection) {
 }
 
 void Transporter::AddSendRequest(SendRequest req) {
- _collector.Add(req);
+  _collector.Add(req);
 }
 
 bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) {
@@ -56,11 +58,10 @@ bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) 
   for(auto obj : objects) {
     if(FD_ISSET((int)obj->Handle(), &rfds)) {
       if(!obj->IsServerSocket()) {
-        Data data = _connection->Read(obj->Handle());
-        obj->OnDataRead(data);
+        _connection->Read(obj);
       }
       else {
-        _connection->Accept(obj->Handle());
+        _connection->Accept(obj);
       }
     }
   }
@@ -70,11 +71,16 @@ bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) 
   for(auto req : _req_vec) {
     std::shared_ptr<SocketObject> obj = req._obj.Get();
     int socket = (int)obj->Handle();
+    bool resend = false;
+
     if(FD_ISSET(socket, &wfds)) {
-      bool ok = _connection->Write(socket, req._msg);
-      obj->OnMsgWrite(req._msg, ok);
+      if(!_connection->Write(obj, req._msg))
+        resend = true;
     }
-    else {
+    else
+      resend = true;
+
+    if(resend) {
       req._obj.Unlock();
       resend_vec.push_back(req);
     }
