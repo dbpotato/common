@@ -114,6 +114,12 @@ protected:
 
   std::shared_ptr<spdlog::logger> InternalInitialize(int id,
                                              std::shared_ptr<spdlog::sinks::sink> additional_sink = nullptr) {
+    std::lock_guard<std::mutex> lock(_init_mutex);
+
+    auto recheck = InternalGet(id);
+    if(recheck)
+      return recheck;
+
     auto sink = std::make_shared<func_sink>();
     std::shared_ptr<spdlog::logger> logger;
 
@@ -137,6 +143,7 @@ protected:
   }
 
   std::shared_ptr<spdlog::logger> _default_logger;
+  std::mutex _init_mutex;
 };
 
 static std::shared_ptr<spdlog::logger> log(int id = 0) {
