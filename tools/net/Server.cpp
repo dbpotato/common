@@ -22,30 +22,82 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Server.h"
-#include "Logger.h"
 
-Server::Server(size_t raw_handle, std::shared_ptr<Connection> connection)
+Server::Server(int raw_handle,
+               std::shared_ptr<Connection> connection,
+               std::vector<std::weak_ptr<ClientManager> >& listeners,
+               bool is_raw)
     : SocketObject(raw_handle, true, connection)
-    , _started(false) {
+    ,_listeners(listeners)
+    ,_is_raw(is_raw) {
 }
 
-bool Server::Init(std::weak_ptr<ServerManager> mgr) {
-  if(_started) {
-    DLOG(error, "Server already started");
-    return false;
+void Server::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
+  for(auto listener_wp : _listeners)
+    if(auto listener = listener_wp.lock())
+       listener->OnClientRead(client, msg);
+}
+
+void Server::OnClientClosed(std::shared_ptr<Client> client) {
+  RemoveClient(client->GetId());
+  for(auto listener_wp : _listeners)
+    if(auto listener = listener_wp.lock())
+       listener->OnClientClosed(client);
+}
+
+void Server::OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) {
+  for(auto listener_wp : _listeners)
+    if(auto listener = listener_wp.lock())
+       listener->OnMsgSent(client, msg, success);
+}
+
+void Server::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+  if(err == NetError::OK) {
+    AddClient(client);
   }
-  _manager = mgr;
-  _started = true;
-  return true;
+
+  for(auto listener_wp : _listeners)
+    if(auto listener = listener_wp.lock())
+      listener->OnClientConnected(client, err);
 }
 
-void Server::OnClientConnected(std::shared_ptr<Client> client) {
-  if (client) {
-    if(auto manager = _manager.lock())
-      manager->OnClientConnected(client);
+bool Server::IsRaw() {
+  return _is_raw;
+}
+
+void Server::AddClient(std::shared_ptr<Client> client) {
+  std::lock_guard<std::mutex> lock(_mutex);
+  _clients.insert(std::make_pair(client->GetId(),client));
+}
+
+bool Server::RemoveClient(uint32_t id) {
+  std::lock_guard<std::mutex> lock(_mutex);
+  auto it = _clients.find(id);
+  if(it!=_clients.end()) {
+    _clients.erase(it);
+    return true;
   }
+  return false;
 }
 
-bool Server::IsActive() {
-  return _started;
+std::shared_ptr<Client> Server::GetClient(uint32_t id) {
+  std::lock_guard<std::mutex> lock(_mutex);
+  std::shared_ptr<Client> result;
+  auto it = _clients.find(id);
+  if(it!=_clients.end())
+    result = it->second;
+
+  return result;
 }
+
+void Server::GetClients(std::vector<std::shared_ptr<Client> >& vec) {
+  std::lock_guard<std::mutex> lock(_mutex);
+  for(auto kv : _clients)
+    vec.push_back(kv.second);
+}
+
+void Server::Clear() {
+  std::lock_guard<std::mutex> lock(_mutex);
+  _clients.clear();
+}
+

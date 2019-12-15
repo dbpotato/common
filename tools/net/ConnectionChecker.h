@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "PosixThread.h"
+#include "Client.h"
 
 #include <string>
 #include <memory>
@@ -31,42 +32,48 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 class Connection;
 class Client;
+class ClientManager;
 
-class ConnectionKeeper {
-public :
-  virtual void OnConnected(std::shared_ptr<Client> client) = 0;
-  virtual void OnDisconnected() = 0;
-  virtual void SendPing() = 0;
-};
 
-class ConnectionChecker : public ThreadObject, public std::enable_shared_from_this<ConnectionChecker> {
+class ConnectionChecker : public ThreadObject
+                        , public ClientManager
+                        , public std::enable_shared_from_this<ConnectionChecker> {
 public:
   enum ConnectionState{
     NOT_CONNECTED,
     CONNECTED,
     MAYBE_CONNECTED
   };
-  ConnectionChecker(std::weak_ptr<ConnectionKeeper> keeper,
-                    std::shared_ptr<Connection> connection,
+  ConnectionChecker(std::shared_ptr<Connection> connection,
                     size_t check_interval_in_sec,
                     const std::string& server_url,
-                    int server_port);
+                    int server_port,
+                    bool is_raw);
 
   ~ConnectionChecker();
   void Init();
-  void Wake();
-  void Reset();
   void OnThreadStarted(int thread_id) override;
 
+  virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
+  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
+  virtual void OnClientClosed(std::shared_ptr<Client> client) override;
+  bool IsRaw() override;
+
+  virtual std::shared_ptr<Message> CreatePingMessage() = 0;
+
 protected :
+  std::shared_ptr<Client> GetClient();
+
+private :
   void TryConnect();
+  void SendPing();
   void SetState(ConnectionState new_state);
-  std::weak_ptr<ConnectionKeeper> _keeper;
   std::shared_ptr<Connection> _connection;
+  std::shared_ptr<Client> _current_client;
   PosixThread _alive_check;
   size_t _check_interval_in_sec;
   std::string _server_url;
   int _server_port;
   std::atomic<ConnectionState> _state;
-  std::shared_ptr<Client> _current_client;
+  bool _is_raw;
 };

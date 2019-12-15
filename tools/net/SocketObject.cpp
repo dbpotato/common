@@ -25,14 +25,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Connection.h"
 #include "Logger.h"
 
-Data::Data() : _size(0) {
-}
-
-SocketObject::SocketObject(size_t raw_handle,
+SocketObject::SocketObject(int raw_handle,
                            bool is_server_socket,
                            std::shared_ptr<Connection> connection)
     : _raw_handle(raw_handle)
     , _is_server_socket(is_server_socket)
+    , _is_active(true)
     , _connection(connection) {
 }
 
@@ -40,31 +38,26 @@ SocketObject::~SocketObject() {
   _connection->Close(this);
 }
 
-void SocketObject::OnDataRead(Data& data) {
-}
-
-void SocketObject::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
-}
-
-void SocketObject::OnConnectionClosed() {
-}
-
-bool SocketObject::IsActive() {
-  return false;
-}
-
 bool SocketObject::IsServerSocket() {
   return _is_server_socket;
 }
 
-size_t SocketObject::Handle() {
+int SocketObject::Handle() {
   return _raw_handle;
 }
 
-std::shared_ptr<SessionInfo> SocketObject::Session() {
+std::shared_ptr<SessionInfo> SocketObject::GetSession() {
   return _session;
 }
 
 void SocketObject::SetSession(std::shared_ptr<SessionInfo> session) {
   _session = session;
+}
+
+bool SocketObject::IsActive() {
+  return _is_active;
+}
+
+void SocketObject::SetActive(bool is_active) {
+  _is_active = is_active;
 }

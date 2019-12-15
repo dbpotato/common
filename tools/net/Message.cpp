@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2019 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -33,8 +33,10 @@ Message::Message(uint32_t size, const void* data)
   , _size(size)
   , _write_offset(0)
   , _is_raw(true) {
-  _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
-  std::memcpy(_data.get(), data, _size);
+  if(_size) {
+    _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
+    std::memcpy(_data.get(), data, _size);
+  }
 }
 
 Message::Message(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t offset, bool copy)

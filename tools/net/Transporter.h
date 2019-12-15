@@ -30,8 +30,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/select.h>
 
 class Connection;
-class SocketObject;
+class Client;
 class Message;
+class SocketObject;
 
 template<class T>
 class LockablePtr {
@@ -56,14 +57,11 @@ public:
 };
 
 struct SendRequest {
-  LockablePtr<SocketObject> _obj;
+  LockablePtr<Client> _obj;
   std::shared_ptr<Message> _msg;
-  SendRequest(std::weak_ptr<SocketObject> obj, std::shared_ptr<Message> msg)
+  SendRequest(std::weak_ptr<Client> obj, std::shared_ptr<Message> msg)
       : _obj(obj)
       , _msg(msg){}
-  void Unlock() {
-    _obj.Unlock();
-  }
 };
 
 class Transporter {
@@ -76,6 +74,8 @@ public:
 private:
   void UpdateSendRequests();
   int Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects);
+  int HandleReceive(std::vector<std::shared_ptr<SocketObject> >& objects, fd_set& rfds);
+  bool HandleSend(fd_set& wfds);
 
   Collector<SendRequest> _collector;
   std::shared_ptr<Connection> _connection;

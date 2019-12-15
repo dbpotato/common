@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,27 +23,49 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Connection.h"
+#include "Message.h"
+#include "Client.h"
 #include "SocketObject.h"
+#include "Utils.h"
 
-class Client;
+#include <memory>
+#include <map>
+#include <vector>
+#include <atomic>
 
-class ServerManager {
+
+class Server : public ClientManager,
+                   public SocketObject,
+                   public std::enable_shared_from_this<Server> {
+
+friend  std::shared_ptr<Server> Connection::CreateServer(int,std::vector<std::weak_ptr<ClientManager> >&, bool);
+
 public:
-  virtual void OnClientConnected(std::shared_ptr<Client> client) = 0;
-};
+  std::shared_ptr<Client> GetClient(uint32_t id);
+  void GetClients(std::vector<std::shared_ptr<Client> >& vec);
 
-class Server : public SocketObject {
+  //ClientManager interface implementations
+  virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
+  virtual void OnClientClosed(std::shared_ptr<Client> client) override;
+  virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) override;
+  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
+  bool IsRaw() override;
 
-friend class std::shared_ptr<Server> Connection::CreateServer(int);
-
-public:
-  bool Init(std::weak_ptr<ServerManager> mgr);
-  void OnClientConnected(std::shared_ptr<Client> client);
-  bool IsActive() override;
 protected:
-  std::weak_ptr<ServerManager> _manager;
-private:
-  Server(size_t raw_handle, std::shared_ptr<Connection> connection);
-  bool _started;
+  void AddClient(std::shared_ptr<Client> client);
+  bool RemoveClient(uint32_t id);
+  void Clear();
+
+  std::shared_ptr<Server> _server;
+  std::shared_ptr<Connection> _connection;
+  std::map<uint32_t, std::shared_ptr<Client> > _clients;
+  std::vector<std::weak_ptr<ClientManager> > _listeners;
+  std::mutex _mutex;
+  bool _is_raw;
+
+private :
+  Server(int raw_handle,
+         std::shared_ptr<Connection> connection,
+         std::vector<std::weak_ptr<ClientManager> >& listeners,
+         bool is_raw);
 };

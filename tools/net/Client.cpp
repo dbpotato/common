@@ -22,12 +22,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Client.h"
+#include "Server.h"
 #include "Message.h"
 #include "Logger.h"
 #include "Connection.h"
 
-#include <limits>
 
+#include <limits>
 
 
 std::atomic<uint32_t> Client::_id_counter(0);
@@ -38,18 +39,29 @@ uint32_t Client::NextId() {
   return ++_id_counter;
 }
 
-Client::Client(size_t raw_handle,
+Client::Client(int raw_handle,
                std::shared_ptr<Connection> connection,
                const std::string& ip,
                int port,
-               const std::string& url)
+               const std::string& url,
+               std::weak_ptr<ClientManager> manager)
     : SocketObject(raw_handle, false, connection)
-    , _id(NextId())
-    , _is_raw(false)
-    , _is_started(false)
-    , _url(url)
     , _ip(ip)
-    , _port(port) {
+    , _port(port)
+    , _url(url)
+    , _manager(manager)
+    , _id(NextId()) {
+  if(auto mgr = _manager.lock())
+    _is_raw = mgr->IsRaw();
+}
+
+void Client::Update(int socket, const std::string& ip) {
+  _raw_handle = socket;
+  _ip = ip;
+}
+
+void Client::SetManager(std::weak_ptr<ClientManager> manager) {
+  _manager = manager;
 }
 
 int Client::GetId() {
@@ -69,21 +81,21 @@ int Client::GetPort() {
 }
 
 void Client::Send(std::shared_ptr<Message> msg) {
-  _connection->SendMsg(shared_from_this(), msg);
-}
-
-void Client::Start(std::weak_ptr<ClientManager> mgr, bool is_raw) {
-  if(!_is_started) {
-    _manager = mgr;
-    _is_raw = is_raw;
-    _is_started = true;
+  if(!IsActive()) {
+    DLOG(error, "Client::Send - client is not active");
+    return;
   }
-  else
-    DLOG(error, "Client::Start - already started,id : {}", _id);
+  _connection->SendMsg(SharedPtr(), msg);
 }
 
 std::shared_ptr<Client> Client::SharedPtr() {
   return std::static_pointer_cast<Client>(shared_from_this());
+}
+
+void Client::OnConnected(NetError err) {
+  if(auto manager = _manager.lock()) {
+    manager->OnClientConnected(SharedPtr(), err);
+  }
 }
 
 void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
@@ -96,9 +108,9 @@ void Client::OnDataRead(Data& data) {
     std::vector<std::shared_ptr<Message> > msgs;
     _msg_builder.AddData(data, msgs);
     if(msgs.size())
-    if(auto manager = _manager.lock())
-      for(auto msg : msgs)
-        manager->OnClientRead(SharedPtr(), msg);
+      if(auto manager = _manager.lock())
+        for(auto msg : msgs)
+          manager->OnClientRead(SharedPtr(), msg);
   }
   else {
     auto msg = std::make_shared<Message>(0, data._size, data._data);
@@ -113,6 +125,4 @@ void Client::OnConnectionClosed() {
     manager->OnClientClosed(SharedPtr());
 }
 
-bool Client::IsActive() {
-  return _is_started;
-}
+

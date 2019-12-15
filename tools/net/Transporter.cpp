@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Connection.h"
 #include "Message.h"
 #include "SocketObject.h"
+#include "Client.h"
 #include "Logger.h"
 
 
@@ -54,40 +55,8 @@ bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) 
   }
 
   UpdateSendRequests();
-
-  for(auto obj : objects) {
-    if(FD_ISSET((int)obj->Handle(), &rfds)) {
-      if(!obj->IsServerSocket()) {
-        _connection->Read(obj);
-      }
-      else {
-        _connection->Accept(obj);
-      }
-    }
-  }
-
-  std::vector<SendRequest> resend_vec;
-
-  for(auto req : _req_vec) {
-    std::shared_ptr<SocketObject> obj = req._obj.Get();
-    int socket = (int)obj->Handle();
-    bool resend = false;
-
-    if(FD_ISSET(socket, &wfds)) {
-      if(!_connection->Write(obj, req._msg))
-        resend = true;
-    }
-    else
-      resend = true;
-
-    if(resend) {
-      req._obj.Unlock();
-      resend_vec.push_back(req);
-    }
-  }
-
-  _req_vec = resend_vec;
-  return true;
+  int count = HandleReceive(objects, rfds);
+  return (HandleSend(wfds) || count);
 }
 
 void Transporter::UpdateSendRequests() {
@@ -107,6 +76,50 @@ void Transporter::UpdateSendRequests() {
   }
 }
 
+int Transporter::HandleReceive(std::vector<std::shared_ptr<SocketObject> >& objects, fd_set& rfds) {
+  int processed = 0;
+
+  for(auto obj : objects) {
+    if(FD_ISSET(obj->Handle(), &rfds) || (obj->GetSession() && obj->GetSession()->HasReadPending())) {
+      _connection->ProcessSocket(obj);
+      ++processed;
+    }
+  }
+
+  return processed;
+}
+
+bool Transporter::HandleSend(fd_set& wfds) {
+  std::vector<SendRequest> resend_vec;
+  std::set<int> resend_soc;
+
+  if(!_req_vec.size())
+    return false;
+
+  for(auto req : _req_vec) {
+    auto client = req._obj.Get();
+    int socket = client->Handle();
+    bool resend = false;
+
+    if((FD_ISSET(socket, &wfds)) && (resend_soc.find(socket) == resend_soc.end())) {
+      if(!_connection->Write(client, req._msg)) {
+        resend = true;
+        resend_soc.insert(socket);
+      }
+    }
+    else
+      resend = true;
+
+    if(resend) {
+      req._obj.Unlock();
+      resend_vec.push_back(req);
+    }
+  }
+
+  _req_vec = resend_vec;
+  return true;
+}
+
 int Transporter::Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects) {
   struct timeval timeout;
   timeout.tv_sec = 0;
@@ -115,7 +128,7 @@ int Transporter::Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<
   int max_fd = -1;
 
   for(auto obj : objects) {
-    int fd = (int)obj->Handle();
+    int fd = obj->Handle();
     FD_SET(fd, &rfds);
     FD_SET(fd, &wfds);
     if(fd > max_fd)

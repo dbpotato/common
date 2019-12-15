@@ -26,59 +26,80 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "PosixThread.h"
 #include "Transporter.h"
 #include "SocketObject.h"
+#include "Utils.h"
 
 #include <string>
 #include <map>
+#include <set>
 #include <vector>
 #include <mutex>
 
 class Message;
 class SessionInfo;
 class Client;
+class ClientManager;
+class ClientOwner;
 class Server;
-struct addrinfo;
+class BaseSessionInfo;
 
 
 class Connection : public std::enable_shared_from_this<Connection>
                  , public ThreadObject {
 
-friend bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >&);
+friend class Transporter;
 friend SocketObject::~SocketObject();
 
-public:
+public: //TODO
   Connection();
   virtual ~Connection();
-  std::shared_ptr<Client> CreateClient(int port, const std::string& host);
-  std::shared_ptr<Server> CreateServer(int port);
+  void CreateClient(int port,
+                    const std::string& host,
+                    std::weak_ptr<ClientManager> mgr);
 
-  void SendMsg(std::shared_ptr<SocketObject>, std::shared_ptr<Message> msg);
+  std::shared_ptr<Server> CreateServer(int port,
+                                       std::vector<std::weak_ptr<ClientManager> >& listeners,
+                                       bool is_raw);
+
+  std::shared_ptr<Server> CreateServer(int port,
+                                       std::shared_ptr<ClientManager> listener);
+
+  void SendMsg(std::shared_ptr<Client>, std::shared_ptr<Message> msg);
   void Accept(std::shared_ptr<SocketObject> obj);
 
   void Init();
   void Stop();
   void OnThreadStarted(int thread_id) override;
 
-protected :
-  virtual bool AfterSocketCreated(int socket, std::shared_ptr<SessionInfo>& session);
-  virtual bool AfterSocketAccepted(int socket, std::shared_ptr<SessionInfo>& session);
-  virtual bool SocketRead(std::shared_ptr<SocketObject> obj, void* dest, int dest_size, int& out_read_size);
-  virtual bool SocketWrite(std::shared_ptr<SocketObject> obj, void* buffer, int size, int& out_write_size);
+  virtual NetError AfterSocketCreated(std::shared_ptr<SocketObject> obj);
+  virtual NetError AfterSocketAccepted(std::shared_ptr<SocketObject> obj);
+
+protected: //TODO
+  virtual std::shared_ptr<BaseSessionInfo> CreateSessionInfo(bool from_accept);
+  virtual bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size);
+  virtual bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size);
   virtual void Close(SocketObject* obj);
 
-  int CreateSocket(int port,
-                   const std::string& host,
-                   std::string& out_ip,
-                   bool is_server_socket = false);
-  void Read(std::shared_ptr<SocketObject> obj);
-  bool Write(std::shared_ptr<SocketObject> obj, std::shared_ptr<Message>);
-  int SyncConnect(int sfd, addrinfo* addr_info);
-  void AddSocket(int socket, std::weak_ptr<SocketObject> client);
+  int CreateServerSocket(int port);
+
+  void ProcessSocket(std::shared_ptr<SocketObject> obj);
+  void ProcessUnfinishedSocket(std::shared_ptr<SocketObject> obj);
+
+  void Read(std::shared_ptr<Client> obj);
+  bool Write(std::shared_ptr<Client> obj, std::shared_ptr<Message>);
+
+  void AddSocket(std::shared_ptr<SocketObject> socket);
+  void AddUnfinishedClient(std::shared_ptr<Client> client);
+
+  void ConnectClients();
   bool CallTransporter();
   void ThreadCheck();
 
   PosixThread _run_thread;
   Transporter _transporter;
-  std::map<int, std::weak_ptr<SocketObject> >  _sockets;
-  std::mutex _client_mutex;
-  int _red_buff_lenght;
+
+private: //TODO
+  std::mutex _socket_mutex;
+  std::mutex _uf_client_mutex;
+  std::vector<std::weak_ptr<SocketObject> >  _sockets;
+  std::vector<std::shared_ptr<Client> > _unfinshed_clients;
 };

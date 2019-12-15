@@ -26,55 +26,59 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "PosixThread.h"
 #include "MessageBuilder.h"
 #include "SocketObject.h"
+#include "Utils.h"
 
 #include <mutex>
 
 class Message;
 class Client;
-class Connection;
 
 class ClientManager {
 public:
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) = 0;
+  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err) = 0;
   virtual void OnClientClosed(std::shared_ptr<Client> client) = 0;
   virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) = 0;
+  virtual bool IsRaw() = 0;
 };
 
 class Client : public SocketObject {
 
-friend std::shared_ptr<Client> Connection::CreateClient(int, const std::string&);
+friend void Connection::CreateClient(int, const std::string&, std::weak_ptr<ClientManager>);
 friend void Connection::Accept(std::shared_ptr<SocketObject>);
 
 public:
-  void Start(std::weak_ptr<ClientManager> mgr, bool is_raw = false);
   void Send(std::shared_ptr<Message> msg);
-  int GetId();
 
+  void OnMsgWrite(std::shared_ptr<Message> msg, bool status);
+  void OnDataRead(Data& data);
+  void OnConnectionClosed();
+  void OnConnected(NetError err);
+
+  int GetId();
   const std::string& GetUrl();
   const std::string& GetIp();
   int GetPort();
   std::shared_ptr<Client> SharedPtr();
-
-  void OnMsgWrite(std::shared_ptr<Message> msg, bool status) override;
-  void OnDataRead(Data& data) override;
-  void OnConnectionClosed() override;
-  bool IsActive() override;
+  void Update(int socket, const std::string& ip);
+  void SetManager(std::weak_ptr<ClientManager> manager);
 
 protected:
   static uint32_t NextId();
-  int _id;
-  std::weak_ptr<ClientManager> _manager;
-  bool _is_raw;
-  std::atomic_bool _is_started;
-  MessageBuilder _msg_builder;
   static std::atomic<uint32_t> _id_counter;
 private:
-  Client(size_t raw_handle,
+  Client(int raw_handle,
          std::shared_ptr<Connection> connection,
          const std::string& ip = {},
-         int port = -1,
-         const std::string& url = {});
-  std::string _url;
+         int port = DEFAULT_SOCKET,
+         const std::string& url = {},
+         std::weak_ptr<ClientManager> manager = {});
+
   std::string _ip;
   int _port;
+  std::string _url;
+  std::weak_ptr<ClientManager> _manager;
+  int _id;
+  bool _is_raw;
+  MessageBuilder _msg_builder;
 };

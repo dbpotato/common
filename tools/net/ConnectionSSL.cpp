@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "ConnectionSSL.h"
+#include "Client.h"
 #include "Logger.h"
 #include "Message.h"
 
@@ -67,16 +68,38 @@ std::string SSLErrStr(const SSL* ssl, int res) {
   }
 };
 
-SessionInfoSSL::SessionInfoSSL(SSL* ssl_handle)
-    : _ssl_handle(ssl_handle) {
+SessionInfoSSL::SessionInfoSSL(bool from_accept)
+    : BaseSessionInfo(from_accept)
+    , _ssl_handle(nullptr)
+    , _read_pending(false) {
 }
 
 SessionInfoSSL::~SessionInfoSSL() {
-  SSL_free(_ssl_handle);
+  if(_ssl_handle) {
+    SSL_free(_ssl_handle);
+    _ssl_handle = nullptr;
+  }
+}
+
+SSL* SessionInfoSSL::SSLHandle() {
+    return _ssl_handle;
+}
+
+void SessionInfoSSL::SetSSLHandle(SSL* ssl) {
+  _ssl_handle = ssl;
+}
+
+bool SessionInfoSSL::HasReadPending() {
+  return _read_pending;
+}
+
+void SessionInfoSSL::SetReadPending(bool is_pending) {
+  _read_pending = is_pending;
 }
 
 ConnectionSSL::ConnectionSSL(SSL_CTX* ctx)
     : _ctx(ctx) {
+  SSL_CTX_set_mode(_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
 }
 
 ConnectionSSL::~ConnectionSSL() {
@@ -84,72 +107,109 @@ ConnectionSSL::~ConnectionSSL() {
     SSL_CTX_free(_ctx);
 }
 
-bool ConnectionSSL::AfterSocketCreated(int socket, std::shared_ptr<SessionInfo>& session) {
-  SSL* ssl = SSL_new(_ctx);
-  SSL_set_fd(ssl, socket);
-  int res = SSL_connect(ssl);
-  if (res == 1) {
-    session = std::make_shared<SessionInfoSSL>(ssl);
-    return true;
-  }
-
-  DLOG(error, "ConnectionSSL::AfterSocketCreated SSL_connect fail : {}", SSLErrStr(ssl, res));
-  return false;
+std::shared_ptr<BaseSessionInfo> ConnectionSSL::CreateSessionInfo(bool from_accept) {
+  return std::make_shared<SessionInfoSSL>(from_accept);
 }
 
-bool ConnectionSSL::AfterSocketAccepted(int socket, std::shared_ptr<SessionInfo>& session) {
-  SSL* ssl = SSL_new(_ctx);
-  SSL_set_fd(ssl, socket);
-  int res = SSL_accept(ssl);
+NetError ConnectionSSL::AfterSocketCreated(std::shared_ptr<SocketObject> obj) {
+  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
+  auto ssl_handle = session->SSLHandle();
+  if(!ssl_handle) {
+    ssl_handle = SSL_new(_ctx);
+    SSL_set_fd(ssl_handle, obj->Handle());
+    session->SetSSLHandle(ssl_handle);
+  }
+
+  int res = SSL_connect(ssl_handle);
   if(res == 1) {
-    session = std::make_shared<SessionInfoSSL>(ssl);
-    return true;
+    return NetError::OK;
   }
 
-  DLOG(error, "ConnectionSSL::AfterSocketCreated SSL_connect fail : {}", SSLErrStr(ssl, res));
-  return false;
+
+  int err = SSL_get_error(ssl_handle, res);
+  if((err == SSL_ERROR_WANT_READ) ||
+     (err == SSL_ERROR_WANT_WRITE)) {
+    return NetError::RETRY;
+  }
+
+  DLOG(error, "ConnectionSSL::AfterSocketCreated SSL_connect fail : {}", SSLErrStr(ssl_handle, res));
+  return NetError::FAILED;
 }
 
-bool ConnectionSSL::SocketRead(std::shared_ptr<SocketObject> obj, void* dest, int dest_size, int& out_read_size) {
-  auto ssl_session = std::static_pointer_cast<SessionInfoSSL>(obj->Session());
-  SSL* ssl = ssl_session->Handle();
-  int res = SSL_read(ssl, dest, dest_size);
-  if(res < 0) {
+NetError ConnectionSSL::AfterSocketAccepted(std::shared_ptr<SocketObject> obj) {
+  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
+  auto ssl_handle = session->SSLHandle();
+  if(!ssl_handle) {
+    ssl_handle = SSL_new(_ctx);
+    SSL_set_fd(ssl_handle, obj->Handle());
+    session->SetSSLHandle(ssl_handle);
+  }
+
+  int res = SSL_accept(ssl_handle);
+  if(res == 1)
+    return NetError::OK;
+
+
+  int err = SSL_get_error(ssl_handle, res);
+  if((err == SSL_ERROR_WANT_READ) ||
+     (err == SSL_ERROR_WANT_WRITE)) {
+    return NetError::RETRY;
+  }
+
+  DLOG(error, "ConnectionSSL::AfterSocketAccepted SSL_accept fail : {}", SSLErrStr(ssl_handle, res));
+  return NetError::FAILED;
+}
+
+bool ConnectionSSL::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size) {
+  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
+  auto ssl_handle = session->SSLHandle();
+  bool result = true;
+  int read_size = 0;
+  int read_blocked = 0;
+
+  read_size = SSL_read(ssl_handle, dest, dest_size);
+  if(read_size <= 0) {
     out_read_size = 0;
-    int err = SSL_get_error(ssl, res);
+    int err = SSL_get_error(ssl_handle, read_size);
     if((err == SSL_ERROR_WANT_READ) ||
        (err == SSL_ERROR_WANT_WRITE)) {
-      return true;
+      read_blocked = 1;
     }
     else {
-      DLOG(error, "ConnectionSSL SSL_read fail : {}", SSLErrStr(ssl, res));
-      return false;
+      DLOG(error, "ConnectionSSL SSL_read fail : {}", SSLErrStr(ssl_handle, read_size));
+      result = false;
     }
   }
-  else
-    out_read_size = res;
 
-  return true;
+  session->SetReadPending(SSL_pending(ssl_handle) && !read_blocked);
+
+  if(result)
+    out_read_size = read_size;
+
+  return result;
 }
 
-bool ConnectionSSL::SocketWrite(std::shared_ptr<SocketObject> obj, void* buffer, int size, int& out_write_size) {
-  auto ssl_session = std::static_pointer_cast<SessionInfoSSL>(obj->Session());
-  SSL* ssl = ssl_session->Handle();
-  int res = SSL_write(ssl, buffer, size);
+bool ConnectionSSL::SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size) {
+  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
+  auto ssl_handle = session->SSLHandle();
+
+  size_t written = 0;
+
+  int res = SSL_write(ssl_handle, buffer, size);
   if(res <= 0) {
     out_write_size = 0;
-    int err = SSL_get_error(ssl, res);
+    int err = SSL_get_error(ssl_handle, res);
     if((err == SSL_ERROR_WANT_READ) ||
        (err == SSL_ERROR_WANT_WRITE)) {
       return true;
     }
     else {
-      DLOG(error, "ConnectionSSL SSL_write fail : {}", SSLErrStr(ssl, res));
+      DLOG(error, "ConnectionSSL SSL_write fail : {}", SSLErrStr(ssl_handle, res));
       return false;
     }
   }
-  else
+  else {
     out_write_size = res;
-
+  }
   return true;
 }

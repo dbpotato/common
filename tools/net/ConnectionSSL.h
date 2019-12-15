@@ -24,28 +24,34 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "Connection.h"
-#include "SocketObject.h"
+#include "BaseSessionInfo.h"
 
 #include "openssl/ssl.h"
 
-class SessionInfoSSL : public SessionInfo {
+class SessionInfoSSL : public BaseSessionInfo {
 public:
-  SessionInfoSSL(SSL* ssl_handle);
+  SessionInfoSSL(bool from_accept);
   ~SessionInfoSSL();
-  SSL* Handle(){return _ssl_handle;}
+  SSL* SSLHandle();
+  void SetSSLHandle(SSL* ssl);
+  bool HasReadPending() override;
+  void SetReadPending(bool is_pending);
 private :
   SSL* _ssl_handle;
+  bool _read_pending;
 };
 
 class ConnectionSSL : public Connection {
 public:
   ConnectionSSL(SSL_CTX* ctx);
  ~ConnectionSSL();
+
+  NetError AfterSocketCreated(std::shared_ptr<SocketObject> obj);
+  NetError AfterSocketAccepted(std::shared_ptr<SocketObject> obj);
 protected:
-  bool AfterSocketCreated(int socket, std::shared_ptr<SessionInfo>& session) override;
-  bool AfterSocketAccepted(int socket, std::shared_ptr<SessionInfo>& session) override;
-  bool SocketRead(std::shared_ptr<SocketObject> obj, void* dest, int dest_size, int& out_read_size) override;
-  bool SocketWrite(std::shared_ptr<SocketObject> obj, void* buffer, int size, int& out_write_size) override;
+  std::shared_ptr<BaseSessionInfo> CreateSessionInfo(bool from_accept);
+  bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size);
+  bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size);
 private:
   SSL_CTX* _ctx;
 };
