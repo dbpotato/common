@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -38,6 +38,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <netinet/in.h>
 #include <netdb.h>
 
+
 std::string SSLErrStr(const SSL* ssl, int res) {
   int err = SSL_get_error(ssl, res);
   switch(err) {
@@ -68,33 +69,40 @@ std::string SSLErrStr(const SSL* ssl, int res) {
   }
 };
 
-SessionInfoSSL::SessionInfoSSL(bool from_accept)
-    : BaseSessionInfo(from_accept)
+SocketContextSSL::SocketContextSSL(bool from_accept)
+    : SocketContext(from_accept)
     , _ssl_handle(nullptr)
     , _read_pending(false) {
 }
 
-SessionInfoSSL::~SessionInfoSSL() {
+SocketContextSSL::~SocketContextSSL() {
   if(_ssl_handle) {
     SSL_free(_ssl_handle);
     _ssl_handle = nullptr;
   }
 }
 
-SSL* SessionInfoSSL::SSLHandle() {
+SSL* SocketContextSSL::SSLHandle() {
     return _ssl_handle;
 }
 
-void SessionInfoSSL::SetSSLHandle(SSL* ssl) {
+void SocketContextSSL::SetSSLHandle(SSL* ssl) {
   _ssl_handle = ssl;
 }
 
-bool SessionInfoSSL::HasReadPending() {
+bool SocketContextSSL::HasReadPending() {
   return _read_pending;
 }
 
-void SessionInfoSSL::SetReadPending(bool is_pending) {
+void SocketContextSSL::SetReadPending(bool is_pending) {
   _read_pending = is_pending;
+}
+
+std::shared_ptr<ConnectionSSL> ConnectionSSL::CreateSSL(SSL_CTX* ctx) {
+  std::shared_ptr<ConnectionSSL> conn;
+  conn.reset(new ConnectionSSL(ctx));
+  conn->Init();
+  return conn;
 }
 
 ConnectionSSL::ConnectionSSL(SSL_CTX* ctx)
@@ -107,17 +115,17 @@ ConnectionSSL::~ConnectionSSL() {
     SSL_CTX_free(_ctx);
 }
 
-std::shared_ptr<BaseSessionInfo> ConnectionSSL::CreateSessionInfo(bool from_accept) {
-  return std::make_shared<SessionInfoSSL>(from_accept);
+std::shared_ptr<SocketContext> ConnectionSSL::CreateSocketContext(bool from_accept) {
+  return std::make_shared<SocketContextSSL>(from_accept);
 }
 
 NetError ConnectionSSL::AfterSocketCreated(std::shared_ptr<SocketObject> obj) {
-  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
-  auto ssl_handle = session->SSLHandle();
+  auto context = std::static_pointer_cast<SocketContextSSL>(obj->GetContext());
+  auto ssl_handle = context->SSLHandle();
   if(!ssl_handle) {
     ssl_handle = SSL_new(_ctx);
     SSL_set_fd(ssl_handle, obj->Handle());
-    session->SetSSLHandle(ssl_handle);
+    context->SetSSLHandle(ssl_handle);
   }
 
   int res = SSL_connect(ssl_handle);
@@ -137,12 +145,12 @@ NetError ConnectionSSL::AfterSocketCreated(std::shared_ptr<SocketObject> obj) {
 }
 
 NetError ConnectionSSL::AfterSocketAccepted(std::shared_ptr<SocketObject> obj) {
-  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
-  auto ssl_handle = session->SSLHandle();
+  auto context = std::static_pointer_cast<SocketContextSSL>(obj->GetContext());
+  auto ssl_handle = context->SSLHandle();
   if(!ssl_handle) {
     ssl_handle = SSL_new(_ctx);
     SSL_set_fd(ssl_handle, obj->Handle());
-    session->SetSSLHandle(ssl_handle);
+    context->SetSSLHandle(ssl_handle);
   }
 
   int res = SSL_accept(ssl_handle);
@@ -161,8 +169,8 @@ NetError ConnectionSSL::AfterSocketAccepted(std::shared_ptr<SocketObject> obj) {
 }
 
 bool ConnectionSSL::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size) {
-  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
-  auto ssl_handle = session->SSLHandle();
+  auto context = std::static_pointer_cast<SocketContextSSL>(obj->GetContext());
+  auto ssl_handle = context->SSLHandle();
   bool result = true;
   int read_size = 0;
   int read_blocked = 0;
@@ -181,7 +189,7 @@ bool ConnectionSSL::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest
     }
   }
 
-  session->SetReadPending(SSL_pending(ssl_handle) && !read_blocked);
+  context->SetReadPending(SSL_pending(ssl_handle) && !read_blocked);
 
   if(result)
     out_read_size = read_size;
@@ -190,8 +198,8 @@ bool ConnectionSSL::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest
 }
 
 bool ConnectionSSL::SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size) {
-  auto session = std::static_pointer_cast<SessionInfoSSL>(obj->GetSession());
-  auto ssl_handle = session->SSLHandle();
+  auto context = std::static_pointer_cast<SocketContextSSL>(obj->GetContext());
+  auto ssl_handle = context->SSLHandle();
 
   size_t written = 0;
 

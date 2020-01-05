@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Server.h"
 #include "Logger.h"
 #include "SocketObject.h"
-#include "BaseSessionInfo.h"
+#include "SocketContext.h"
 #include "Transporter.h"
 
 #include <stdio.h>
@@ -43,22 +43,26 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <fcntl.h>
 #include <errno.h>
 
+
 const int SOC_LISTEN = 256;
 const int SOC_READ_BUFF_SIZE = 2048;
-const int TRANSPORTER_IDDLE_SLEEP_IN_MS = 200;
-const int TRANSPORTER_ACTIVE_SLEEP_IN_US = 100;
 
+std::shared_ptr<Connection> Connection::CreateBasic() {
+  std::shared_ptr<Connection> conn;
+  conn.reset(new Connection());
+  conn->Init();
+  return conn;
+}
 
 Connection::Connection() {
-  signal(SIGPIPE, SIG_IGN); //TODO needed?s
+  signal(SIGPIPE, SIG_IGN); //TODO needed ?
 }
 
 Connection::~Connection() {
 }
 
-
-std::shared_ptr<BaseSessionInfo> Connection::CreateSessionInfo(bool from_accept) {
-  return std::make_shared<BaseSessionInfo>(from_accept);
+std::shared_ptr<SocketContext> Connection::CreateSocketContext(bool from_accept) {
+  return std::make_shared<SocketContext>(from_accept);
 }
 
 void Connection::CreateClient(int port,
@@ -72,7 +76,7 @@ void Connection::CreateClient(int port,
                           host,
                           mgr));
 
-  client->SetSession(CreateSessionInfo(false));
+  client->SetContext(CreateSocketContext(false));
   AddUnfinishedClient(client);
 }
 
@@ -86,6 +90,7 @@ std::shared_ptr<Server> Connection::CreateServer(int port,
     return server;
 
   server.reset(new Server(socket, shared_from_this(), listeners, is_raw));
+  server->Init();
   AddSocket(server);
   return server;
 }
@@ -188,7 +193,7 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
                           std::stoi(std::string(port_buf)),
                           {},//url
                           server));
-  client->SetSession(CreateSessionInfo(true));
+  client->SetContext(CreateSocketContext(true));
   AddUnfinishedClient(client);
 }
 
@@ -318,8 +323,7 @@ void Connection::ConnectClients() {
 
     for(auto it = _unfinshed_clients.begin(); it != _unfinshed_clients.end(); ) {
       std::shared_ptr<Client> client = *it;
-      auto session = std::static_pointer_cast<BaseSessionInfo>(client->GetSession());
-      NetError err = session->Continue(client, shared_from_this());
+      NetError err = client->GetContext()->Continue(client, shared_from_this());
       if(err != NetError::RETRY) {
         _clients_to_notify.emplace_back(client, err);
         if(err == NetError::OK)
@@ -358,4 +362,3 @@ void Connection::GetActiveSockets(std::vector<std::shared_ptr<SocketObject> >& o
   if(objects.size())
     out_objects.insert(out_objects.end(), objects.begin(), objects.end());
 }
-

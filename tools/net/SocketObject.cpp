@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "SocketObject.h"
 #include "Connection.h"
-#include "Logger.h"
+
 
 SocketObject::SocketObject(int raw_handle,
                            bool is_server_socket,
@@ -46,16 +46,16 @@ int SocketObject::Handle() {
   return _raw_handle;
 }
 
+std::shared_ptr<SocketContext> SocketObject::GetContext() {
+  return _context;
+}
+
 std::shared_ptr<Connection> SocketObject::GetConnection() {
   return _connection;
 }
 
-std::shared_ptr<SessionInfo> SocketObject::GetSession() {
-  return _session;
-}
-
-void SocketObject::SetSession(std::shared_ptr<SessionInfo> session) {
-  _session = session;
+void SocketObject::SetContext(std::shared_ptr<SocketContext> context) {
+  _context = context;
 }
 
 bool SocketObject::IsActive() {

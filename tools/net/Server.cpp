@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Server.h"
 
+
 Server::Server(int raw_handle,
                std::shared_ptr<Connection> connection,
                std::vector<std::weak_ptr<ClientManager> >& listeners,
@@ -30,6 +31,13 @@ Server::Server(int raw_handle,
     : SocketObject(raw_handle, true, connection)
     ,_listeners(listeners)
     ,_is_raw(is_raw) {
+}
+
+void Server::Init() {
+  auto sptr = std::static_pointer_cast<Server>(shared_from_this());
+  for(auto listener_wp : _listeners)
+    if(auto listener = listener_wp.lock())
+       listener->OnServerCreated(sptr);
 }
 
 void Server::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {

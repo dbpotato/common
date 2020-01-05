@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,16 +22,32 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Client.h"
-#include "Server.h"
 #include "Message.h"
 #include "Logger.h"
 #include "Connection.h"
-
 
 #include <limits>
 
 
 std::atomic<uint32_t> Client::_id_counter(0);
+
+void ClientManager::OnServerCreated(std::weak_ptr<Server> server) {
+}
+
+void ClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
+  DLOG(warn, "ClientManager::OnClientRead : not implemented");
+}
+
+void ClientManager::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+  DLOG(warn, "ClientManager::OnClientConnected : not implemented");
+}
+
+void ClientManager::OnClientClosed(std::shared_ptr<Client> client) {
+}
+
+void ClientManager::OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) {
+}
+
 
 uint32_t Client::NextId() {
   if(_id_counter == std::numeric_limits<uint32_t>::max())

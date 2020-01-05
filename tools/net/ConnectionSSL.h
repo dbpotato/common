@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,14 +24,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "Connection.h"
-#include "BaseSessionInfo.h"
+#include "SocketContext.h"
 
 #include "openssl/ssl.h"
 
-class SessionInfoSSL : public BaseSessionInfo {
+
+class SocketContextSSL : public SocketContext {
 public:
-  SessionInfoSSL(bool from_accept);
-  ~SessionInfoSSL();
+  SocketContextSSL(bool from_accept);
+  ~SocketContextSSL();
   SSL* SSLHandle();
   void SetSSLHandle(SSL* ssl);
   bool HasReadPending() override;
@@ -43,13 +44,14 @@ private :
 
 class ConnectionSSL : public Connection {
 public:
-  ConnectionSSL(SSL_CTX* ctx);
+  static std::shared_ptr<ConnectionSSL> CreateSSL(SSL_CTX* ctx);
  ~ConnectionSSL();
 
-  NetError AfterSocketCreated(std::shared_ptr<SocketObject> obj);
-  NetError AfterSocketAccepted(std::shared_ptr<SocketObject> obj);
+  NetError AfterSocketCreated(std::shared_ptr<SocketObject> obj) override;
+  NetError AfterSocketAccepted(std::shared_ptr<SocketObject> obj) override;
 protected:
-  std::shared_ptr<BaseSessionInfo> CreateSessionInfo(bool from_accept);
+  ConnectionSSL(SSL_CTX* ctx);
+  std::shared_ptr<SocketContext> CreateSocketContext(bool from_accept) override;
   bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size);
   bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size);
 private:

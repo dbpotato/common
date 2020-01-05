@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 Adam Kaniewski
+Copyright (c) 2019 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,8 +25,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Connection.h"
 #include "Message.h"
 #include "SocketObject.h"
+#include "SocketContext.h"
 #include "Client.h"
 #include "Logger.h"
+
+#include <set>
+
 
 std::weak_ptr<Transporter> Transporter::_instance;
 
@@ -43,9 +47,14 @@ void Transporter::Init() {
 }
 
 void Transporter::OnThreadStarted(int thread_id) {
+
   while(_run_thread.ShouldRun()) {
-    CollectActiveSockets();
-    std::this_thread::sleep_for(std::chrono::milliseconds(TRANSPORTER_SLEEP_IN_US));
+    std::vector<std::shared_ptr<SocketObject> > active_objects;
+    Prepare(active_objects);
+    if(!Process(active_objects))
+      std::this_thread::sleep_for(std::chrono::milliseconds(TRANSPORTER_SELECT_TIMEOUT_IN_MS));
+    else
+      std::this_thread::sleep_for(std::chrono::microseconds(TRANSPORTER_SLEEP_IN_US));
   }
 }
 
@@ -69,9 +78,8 @@ void Transporter::AddSendRequest(SendRequest req) {
   _collector.Add(req);
 }
 
-void Transporter::CollectActiveSockets() {
+void Transporter::Prepare(std::vector<std::shared_ptr<SocketObject> >& objects) {
   std::vector<std::shared_ptr<Connection> > connections;
-  std::vector<std::shared_ptr<SocketObject> > sockets;
   {
     std::lock_guard<std::mutex> lock(_conn_mutex);
     for(auto it = _connections.begin(); it != _connections.end(); ) {
@@ -86,12 +94,11 @@ void Transporter::CollectActiveSockets() {
   }
 
   for(auto conn : connections) {
-    conn->GetActiveSockets(sockets);
+    conn->GetActiveSockets(objects);
   }
-  RunOnce(sockets);
 }
 
-bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) {
+bool Transporter::Process(std::vector<std::shared_ptr<SocketObject> >& objects) {
   fd_set rfds, wfds;
   FD_ZERO(&rfds);
   FD_ZERO(&wfds);
@@ -105,7 +112,7 @@ bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) 
   UpdateSendRequests();
   int msgs_received = HandleReceive(objects, rfds);
   bool msgs_sent = HandleSend(wfds);
-  return ( msgs_received || msgs_sent);
+  return ( msgs_received || msgs_sent || !res );
 }
 
 void Transporter::UpdateSendRequests() {
@@ -128,7 +135,8 @@ int Transporter::HandleReceive(std::vector<std::shared_ptr<SocketObject> >& obje
   int processed = 0;
 
   for(auto obj : objects) {
-    if(FD_ISSET(obj->Handle(), &rfds) || (obj->GetSession() && obj->GetSession()->HasReadPending())) {
+    if(FD_ISSET(obj->Handle(), &rfds) ||
+        (obj->GetContext() && obj->GetContext()->HasReadPending())) {
       obj->GetConnection()->ProcessSocket(obj);
       ++processed;
     }

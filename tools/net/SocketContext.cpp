@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 Adam Kaniewski
+Copyright (c) 2019 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -21,7 +21,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#include "BaseSessionInfo.h"
+#include "SocketContext.h"
 #include "Client.h"
 #include "Connection.h"
 #include "Logger.h"
@@ -40,7 +40,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <errno.h>
 
 
-BaseSessionInfo::BaseSessionInfo(bool from_accept)
+SocketContext::SocketContext(bool from_accept)
     : _info(nullptr)
     , _info_next(nullptr)
     , _socket_handle(DEFAULT_SOCKET)
@@ -59,13 +59,13 @@ BaseSessionInfo::BaseSessionInfo(bool from_accept)
   }
 }
 
-BaseSessionInfo::~BaseSessionInfo() {
+SocketContext::~SocketContext() {
   if(_info)
     freeaddrinfo(_info);
 }
 
-NetError BaseSessionInfo::Continue(std::shared_ptr<Client> client,
-                                   std::shared_ptr<Connection> connection) {
+NetError SocketContext::Continue(std::shared_ptr<Client> client,
+                                 std::shared_ptr<Connection> connection) {
   auto start = std::chrono::system_clock::now();
   switch (_state) {
     case GETTING_INFO:
@@ -89,7 +89,7 @@ NetError BaseSessionInfo::Continue(std::shared_ptr<Client> client,
   return StateToError();
 }
 
-void BaseSessionInfo::GetAddrInfo(std::shared_ptr<Client> client) {
+void SocketContext::GetAddrInfo(std::shared_ptr<Client> client) {
   int res = getaddrinfo(client->GetUrl().c_str(),
                         std::to_string(client->GetPort()).c_str(),
                         &_hints,
@@ -99,7 +99,7 @@ void BaseSessionInfo::GetAddrInfo(std::shared_ptr<Client> client) {
       return;
     }
     else {
-      DLOG(error, "BaseSessionInfo : getaddrinfo failed : {}", gai_strerror(res));
+      DLOG(error, "SocketContext : getaddrinfo failed : {}", gai_strerror(res));
       SetState(FAILED);
       return;
     }
@@ -109,7 +109,7 @@ void BaseSessionInfo::GetAddrInfo(std::shared_ptr<Client> client) {
   SetState(NextState());
 }
 
-void BaseSessionInfo::Connect(std::shared_ptr<Client> client) {
+void SocketContext::Connect(std::shared_ptr<Client> client) {
   if(_socket_handle == DEFAULT_SOCKET) {
     _socket_handle = socket(_info_next->ai_family, _info_next->ai_socktype, _info_next->ai_protocol);
     fcntl(_socket_handle, F_SETFL, O_NONBLOCK);
@@ -136,7 +136,7 @@ void BaseSessionInfo::Connect(std::shared_ptr<Client> client) {
     _info_next = _info_next->ai_next;
   }
   else {
-    DLOG(warn, "BaseSessionInfo: connect fail : {}:{} : {}",
+    DLOG(warn, "SocketContext: connect fail : {}:{} : {}",
          client->GetUrl(),
          client->GetPort(),
          strerror(errno));
@@ -149,19 +149,19 @@ void BaseSessionInfo::Connect(std::shared_ptr<Client> client) {
   }
 }
 
-void BaseSessionInfo::AfterConnect(std::shared_ptr<Client> client,
+void SocketContext::AfterConnect(std::shared_ptr<Client> client,
                                    std::shared_ptr<Connection> connection) {
   NetError err = connection->AfterSocketCreated(client);
   ErrToState(err);
 }
 
-void BaseSessionInfo::AfterAccept(std::shared_ptr<Client> client,
+void SocketContext::AfterAccept(std::shared_ptr<Client> client,
                                   std::shared_ptr<Connection> connection) {
   NetError err = connection->AfterSocketAccepted(client);
   ErrToState(err);
 }
 
-void BaseSessionInfo::ErrToState(NetError err) {
+void SocketContext::ErrToState(NetError err) {
   switch(err) {
     case NetError::OK:
       SetState(NextState());
@@ -179,7 +179,7 @@ void BaseSessionInfo::ErrToState(NetError err) {
   }
 }
 
-NetError BaseSessionInfo::StateToError() {
+NetError SocketContext::StateToError() {
   switch(_state) {
     case TIMEOUT:
       return NetError::TIMEOUT;
@@ -192,7 +192,7 @@ NetError BaseSessionInfo::StateToError() {
   }
 }
 
-BaseSessionInfo::State BaseSessionInfo::NextState() {
+SocketContext::State SocketContext::NextState() {
   switch(_state) {
     case GETTING_INFO:
       return CONNECTING;
@@ -206,7 +206,7 @@ BaseSessionInfo::State BaseSessionInfo::NextState() {
   }
 }
 
-void BaseSessionInfo::TimeoutCheck() {
+void SocketContext::TimeoutCheck() {
   if(_time_passed < CONNECT_TIMEOUT_IN_MS)
     return;
 
@@ -217,6 +217,6 @@ void BaseSessionInfo::TimeoutCheck() {
   SetState(TIMEOUT);
 }
 
-void BaseSessionInfo::SetState(State state) {
+void SocketContext::SetState(State state) {
   _state = state;
 }

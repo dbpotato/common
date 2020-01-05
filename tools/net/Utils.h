@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 static const double CONNECT_TIMEOUT_IN_MS = 300.0;
 static const int DEFAULT_SOCKET = -1;
-static const int TRANSPORTER_SLEEP_IN_US = 1;
+static const int TRANSPORTER_SLEEP_IN_US = 100;
 static const int TRANSPORTER_SELECT_TIMEOUT_IN_MS = 250;
 
 enum NetError {

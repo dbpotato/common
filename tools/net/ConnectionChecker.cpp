@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018-2019 Adam Kaniewski
+Copyright (c) 2018-2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <chrono>
 #include <thread>
 
+
 ConnectionChecker::ConnectionChecker(std::shared_ptr<Connection> connection,
                                      size_t check_interval_in_sec,
                                      const std::string& server_url,
@@ -51,6 +52,7 @@ ConnectionChecker::~ConnectionChecker() {
 }
 
 void ConnectionChecker::Init() {
+  DLOG(info, "ConnectionChecker::Init()");
   _alive_check.Run(shared_from_this());
 }
 
@@ -96,6 +98,7 @@ void ConnectionChecker::OnClientRead(std::shared_ptr<Client> client, std::shared
   SetState(ConnectionState::CONNECTED);
 }
 void ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+  DLOG(info, "ConnectionChecker::OnClientConnected() : {}", (err == NetError::OK));
   if(err == NetError::OK) {
     _current_client = client;
     SetState(ConnectionState::CONNECTED);
@@ -103,7 +106,7 @@ void ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client, NetErr
 }
 void ConnectionChecker::OnClientClosed(std::shared_ptr<Client> client) {
   _current_client.reset();
-  _state = ConnectionState::NOT_CONNECTED;
+  SetState(ConnectionState::NOT_CONNECTED);
 }
 
 bool ConnectionChecker::IsRaw() {
@@ -116,6 +119,7 @@ void ConnectionChecker::TryConnect() {
     SetState(ConnectionState::NOT_CONNECTED);
   }
 
+  DLOG(info, "ConnectionChecker::TryConnect(): Create Client");
   _connection->CreateClient(_server_port,
                             _server_url,
                             shared_from_this());

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,21 +23,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Utils.h"
-
 #include <memory>
 
-
-class Message;
 class Connection;
-class Client;
-class ClientManager;
-
-class SessionInfo {
-public:
-  SessionInfo(){};
-  virtual bool HasReadPending() {return false;}
-};
+class SocketContext;
 
 class SocketObject : public std::enable_shared_from_this<SocketObject> {
 
@@ -49,15 +38,15 @@ public:
 
  bool IsServerSocket();
  int Handle();
- std::shared_ptr<SessionInfo> GetSession();
- std::shared_ptr<Connection>  GetConnection();
- void SetSession(std::shared_ptr<SessionInfo> session);
+ std::shared_ptr<SocketContext> GetContext();
+ std::shared_ptr<Connection> GetConnection();
+ void SetContext(std::shared_ptr<SocketContext> context);
  bool IsActive();
  void SetActive(bool is_active);
 protected:
  int _raw_handle;
  bool _is_server_socket;
  bool _is_active;
- std::shared_ptr<SessionInfo> _session;
+ std::shared_ptr<SocketContext> _context;
  std::shared_ptr<Connection> _connection;
 };

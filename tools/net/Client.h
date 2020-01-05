@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -30,15 +30,18 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <mutex>
 
+
 class Message;
 class Client;
+class Server;
 
 class ClientManager {
 public:
-  virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) = 0;
-  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err) = 0;
-  virtual void OnClientClosed(std::shared_ptr<Client> client) = 0;
-  virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) = 0;
+  virtual void OnServerCreated(std::weak_ptr<Server> server);
+  virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
+  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err);
+  virtual void OnClientClosed(std::shared_ptr<Client> client);
+  virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success);
   virtual bool IsRaw() = 0;
 };
 

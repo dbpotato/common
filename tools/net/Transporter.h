@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 Adam Kaniewski
+Copyright (c) 2019 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -52,14 +52,14 @@ public:
   static std::shared_ptr<Transporter> GetTransporter(std::weak_ptr<Connection>);
   ~Transporter();
   void AddSendRequest(SendRequest req);
-  bool RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects); 
   void OnThreadStarted(int thread_id) override;
 
 private:
   Transporter();
   void Init();
   void UpdateSendRequests();
-  void CollectActiveSockets();
+  void Prepare(std::vector<std::shared_ptr<SocketObject> >& objects);
+  bool Process(std::vector<std::shared_ptr<SocketObject> >& objects); 
   int Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects);
   int HandleReceive(std::vector<std::shared_ptr<SocketObject> >& objects, fd_set& rfds);
   bool HandleSend(fd_set& wfds);

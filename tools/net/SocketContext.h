@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 Adam Kaniewski
+Copyright (c) 2019 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,17 +25,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <string>
 #include <memory>
-#include <set>
-#include <vector>
-#include <mutex>
 #include <netdb.h>
 
-#include "SocketObject.h"
 #include "Utils.h"
 
-class Client;
 
-class BaseSessionInfo : public SessionInfo {
+class Client;
+class Connection;
+
+class SocketContext {
 public:
   enum State {
     GETTING_INFO,
@@ -47,10 +45,11 @@ public:
     FAILED,
   };
 
-  BaseSessionInfo(bool from_accept);
-  ~BaseSessionInfo();
+  SocketContext(bool from_accept);
+  ~SocketContext();
   NetError Continue(std::shared_ptr<Client> client,
                     std::shared_ptr<Connection> connection);
+  virtual bool HasReadPending() {return false;}
 private:
   void GetAddrInfo(std::shared_ptr<Client> client);
   void Connect(std::shared_ptr<Client> client);

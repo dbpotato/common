@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Message.h"
 #include "Client.h"
 #include "SocketObject.h"
 #include "Utils.h"
@@ -31,12 +30,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <memory>
 #include <map>
 #include <vector>
-#include <atomic>
 
+
+class Message;
 
 class Server : public ClientManager,
-                   public SocketObject,
-                   public std::enable_shared_from_this<Server> {
+               public SocketObject {
 
 friend  std::shared_ptr<Server> Connection::CreateServer(int,std::vector<std::weak_ptr<ClientManager> >&, bool);
 
@@ -68,4 +67,5 @@ private :
          std::shared_ptr<Connection> connection,
          std::vector<std::weak_ptr<ClientManager> >& listeners,
          bool is_raw);
+  void Init();
 };
