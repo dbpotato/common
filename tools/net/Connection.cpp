@@ -28,6 +28,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Logger.h"
 #include "SocketObject.h"
 #include "BaseSessionInfo.h"
+#include "Transporter.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -63,7 +64,6 @@ std::shared_ptr<BaseSessionInfo> Connection::CreateSessionInfo(bool from_accept)
 void Connection::CreateClient(int port,
                               const std::string& host,
                               std::weak_ptr<ClientManager> mgr) {
-  ThreadCheck();
   std::shared_ptr<Client> client;
   client.reset(new Client(DEFAULT_SOCKET,
                           shared_from_this(),
@@ -79,7 +79,6 @@ void Connection::CreateClient(int port,
 std::shared_ptr<Server> Connection::CreateServer(int port,
                                                  std::vector<std::weak_ptr<ClientManager> >& listeners,
                                                  bool is_raw) {
-  ThreadCheck();
   std::shared_ptr<Server> server;
 
   int socket = CreateServerSocket(port);
@@ -292,26 +291,11 @@ bool Connection::Write(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg
 }
 
 void Connection::Init() {
-  _transporter.Init(shared_from_this());
-  _run_thread.Run(shared_from_this(), 1);
-}
-
-void Connection::OnThreadStarted(int thread_id) {
-  while(_run_thread.ShouldRun()) {
-    ConnectClients();
-    if(CallTransporter())
-      std::this_thread::sleep_for(std::chrono::microseconds(TRANSPORTER_ACTIVE_SLEEP_IN_US));
-    else
-      std::this_thread::sleep_for(std::chrono::milliseconds(TRANSPORTER_IDDLE_SLEEP_IN_MS));
-  }
-}
-
-void Connection::Stop() {
-  _run_thread.Stop();
+  _transporter = Transporter::GetTransporter(shared_from_this());
 }
 
 void Connection::SendMsg(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {
-  _transporter.AddSendRequest(SendRequest(obj, msg));
+  _transporter->AddSendRequest(SendRequest(obj, msg));
 }
 
 void Connection::AddSocket(std::shared_ptr<SocketObject> socket) {
@@ -332,7 +316,7 @@ void Connection::ConnectClients() {
   {
     std::lock_guard<std::mutex> lock(_uf_client_mutex);
 
-    for(auto it = _unfinshed_clients.begin(); it != _unfinshed_clients.end(); ){
+    for(auto it = _unfinshed_clients.begin(); it != _unfinshed_clients.end(); ) {
       std::shared_ptr<Client> client = *it;
       auto session = std::static_pointer_cast<BaseSessionInfo>(client->GetSession());
       NetError err = session->Continue(client, shared_from_this());
@@ -353,7 +337,8 @@ void Connection::ConnectClients() {
   }
 }
 
-bool Connection::CallTransporter() {
+void Connection::GetActiveSockets(std::vector<std::shared_ptr<SocketObject> >& out_objects) {
+  ConnectClients();
   std::vector<std::shared_ptr<SocketObject> > objects;
   {
     std::lock_guard<std::mutex> lock(_socket_mutex);
@@ -370,13 +355,7 @@ bool Connection::CallTransporter() {
     }
   }
 
-  if(!objects.size())
-    return false;
-
-  return _transporter.RunOnce(objects);
+  if(objects.size())
+    out_objects.insert(out_objects.end(), objects.begin(), objects.end());
 }
 
-void Connection::ThreadCheck() {
-  if(!_run_thread.IsRunning())
-    DLOG(warn, "Connection was not intialized");
-}

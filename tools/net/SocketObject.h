@@ -50,6 +50,7 @@ public:
  bool IsServerSocket();
  int Handle();
  std::shared_ptr<SessionInfo> GetSession();
+ std::shared_ptr<Connection>  GetConnection();
  void SetSession(std::shared_ptr<SessionInfo> session);
  bool IsActive();
  void SetActive(bool is_active);

@@ -24,7 +24,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "PosixThread.h"
-#include "Transporter.h"
 #include "SocketObject.h"
 #include "Utils.h"
 
@@ -41,10 +40,10 @@ class ClientManager;
 class ClientOwner;
 class Server;
 class BaseSessionInfo;
+class Transporter;
 
 
-class Connection : public std::enable_shared_from_this<Connection>
-                 , public ThreadObject {
+class Connection : public std::enable_shared_from_this<Connection> {
 
 friend class Transporter;
 friend SocketObject::~SocketObject();
@@ -67,9 +66,7 @@ public: //TODO
   void Accept(std::shared_ptr<SocketObject> obj);
 
   void Init();
-  void Stop();
-  void OnThreadStarted(int thread_id) override;
-
+  void GetActiveSockets(std::vector<std::shared_ptr<SocketObject> >& out_objects);
   virtual NetError AfterSocketCreated(std::shared_ptr<SocketObject> obj);
   virtual NetError AfterSocketAccepted(std::shared_ptr<SocketObject> obj);
 
@@ -91,15 +88,13 @@ protected: //TODO
   void AddUnfinishedClient(std::shared_ptr<Client> client);
 
   void ConnectClients();
-  bool CallTransporter();
-  void ThreadCheck();
 
   PosixThread _run_thread;
-  Transporter _transporter;
 
 private: //TODO
   std::mutex _socket_mutex;
   std::mutex _uf_client_mutex;
   std::vector<std::weak_ptr<SocketObject> >  _sockets;
   std::vector<std::shared_ptr<Client> > _unfinshed_clients;
+  std::shared_ptr<Transporter> _transporter;
 };

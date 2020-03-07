@@ -24,8 +24,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "Collector.h"
+#include "PosixThread.h"
+#include "Utils.h"
 
 #include <memory>
+#include <mutex>
 #include <vector>
 #include <sys/select.h>
 
@@ -34,27 +37,6 @@ class Client;
 class Message;
 class SocketObject;
 
-template<class T>
-class LockablePtr {
-private:
-  std::weak_ptr<T> _weak;
-  std::shared_ptr<T> _shared;
-public:
-  LockablePtr(std::weak_ptr<T> ptr) : _weak(ptr){}
-
-  std::shared_ptr<T> Get() {
-    return _shared;
-  }
-
-  std::shared_ptr<T> Lock() {
-    _shared = _weak.lock();
-    return _shared;
-  }
-
-  void Unlock() {
-    _shared.reset();
-  }
-};
 
 struct SendRequest {
   LockablePtr<Client> _obj;
@@ -64,20 +46,30 @@ struct SendRequest {
       , _msg(msg){}
 };
 
-class Transporter {
+class Transporter : public std::enable_shared_from_this<Transporter>
+                  , public ThreadObject {
 public:
-  Transporter();
-  void Init(std::shared_ptr<Connection> connection);
+  static std::shared_ptr<Transporter> GetTransporter(std::weak_ptr<Connection>);
+  ~Transporter();
   void AddSendRequest(SendRequest req);
   bool RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects); 
+  void OnThreadStarted(int thread_id) override;
 
 private:
+  Transporter();
+  void Init();
   void UpdateSendRequests();
+  void CollectActiveSockets();
   int Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects);
   int HandleReceive(std::vector<std::shared_ptr<SocketObject> >& objects, fd_set& rfds);
   bool HandleSend(fd_set& wfds);
 
+  void AddConnection(std::weak_ptr<Connection>);
+
   Collector<SendRequest> _collector;
-  std::shared_ptr<Connection> _connection;
+  std::vector<std::weak_ptr<Connection> > _connections;
   std::vector<SendRequest> _req_vec;
+  static std::weak_ptr<Transporter> _instance;
+  PosixThread _run_thread;
+  std::mutex _conn_mutex;
 };

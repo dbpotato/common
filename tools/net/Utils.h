@@ -27,6 +27,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 static const double CONNECT_TIMEOUT_IN_MS = 300.0;
 static const int DEFAULT_SOCKET = -1;
+static const int TRANSPORTER_SLEEP_IN_US = 1;
+static const int TRANSPORTER_SELECT_TIMEOUT_IN_MS = 250;
 
 enum NetError {
   OK = 0,
@@ -35,10 +37,31 @@ enum NetError {
   FAILED
 };
 
-
 class Data {
 public:
   uint32_t _size;
   std::shared_ptr<unsigned char> _data;
   Data() : _size(0) {}
+};
+
+template<class T>
+class LockablePtr {
+private:
+  std::weak_ptr<T> _weak;
+  std::shared_ptr<T> _shared;
+public:
+  LockablePtr(std::weak_ptr<T> ptr) : _weak(ptr){}
+
+  std::shared_ptr<T> Get() {
+    return _shared;
+  }
+
+  std::shared_ptr<T> Lock() {
+    _shared = _weak.lock();
+    return _shared;
+  }
+
+  void Unlock() {
+    _shared.reset();
+  }
 };

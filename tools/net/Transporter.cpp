@@ -28,19 +28,67 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Client.h"
 #include "Logger.h"
 
-
-const int SELECT_TIMEOUT_IN_MS = 250;
-
+std::weak_ptr<Transporter> Transporter::_instance;
 
 Transporter::Transporter() {
 }
 
-void Transporter::Init(std::shared_ptr<Connection> connection) {
-  _connection = connection;
+Transporter::~Transporter() {
+  _run_thread.Stop();
+  _run_thread.Join();
+}
+
+void Transporter::Init() {
+  _run_thread.Run(shared_from_this(), 0);
+}
+
+void Transporter::OnThreadStarted(int thread_id) {
+  while(_run_thread.ShouldRun()) {
+    CollectActiveSockets();
+    std::this_thread::sleep_for(std::chrono::milliseconds(TRANSPORTER_SLEEP_IN_US));
+  }
+}
+
+std::shared_ptr<Transporter> Transporter::GetTransporter(std::weak_ptr<Connection> conn) {
+  std::shared_ptr<Transporter> instance;
+  if(!(instance =_instance.lock())) {
+    instance.reset(new Transporter());
+    instance->Init();
+    _instance = instance;
+  }
+  instance->AddConnection(conn);
+  return instance;
+}
+
+void Transporter::AddConnection(std::weak_ptr<Connection> conn) {
+  std::lock_guard<std::mutex> lock(_conn_mutex);
+  _connections.emplace_back(conn);
 }
 
 void Transporter::AddSendRequest(SendRequest req) {
   _collector.Add(req);
+}
+
+void Transporter::CollectActiveSockets() {
+  std::vector<std::shared_ptr<Connection> > connections;
+  std::vector<std::shared_ptr<SocketObject> > sockets;
+  {
+    std::lock_guard<std::mutex> lock(_conn_mutex);
+    for(auto it = _connections.begin(); it != _connections.end(); ) {
+      std::shared_ptr<Connection> conn = (*it).lock();
+      if(conn) {
+        connections.push_back(conn);
+        ++it;
+      }
+      else
+        it = _connections.erase(it);
+    }
+  }
+
+  for(auto conn : connections) {
+    conn->GetActiveSockets(sockets);
+  }
+  RunOnce(sockets);
 }
 
 bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) {
@@ -55,15 +103,15 @@ bool Transporter::RunOnce(std::vector<std::shared_ptr<SocketObject> >& objects) 
   }
 
   UpdateSendRequests();
-  int count = HandleReceive(objects, rfds);
-  return (HandleSend(wfds) || count);
+  int msgs_received = HandleReceive(objects, rfds);
+  bool msgs_sent = HandleSend(wfds);
+  return ( msgs_received || msgs_sent);
 }
 
 void Transporter::UpdateSendRequests() {
 
   std::vector<SendRequest> vec;
   _collector.Collect(vec);
-
   _req_vec.insert(_req_vec.end(), vec.begin(), vec.end());
 
   if(_req_vec.size()) {
@@ -81,7 +129,7 @@ int Transporter::HandleReceive(std::vector<std::shared_ptr<SocketObject> >& obje
 
   for(auto obj : objects) {
     if(FD_ISSET(obj->Handle(), &rfds) || (obj->GetSession() && obj->GetSession()->HasReadPending())) {
-      _connection->ProcessSocket(obj);
+      obj->GetConnection()->ProcessSocket(obj);
       ++processed;
     }
   }
@@ -102,7 +150,7 @@ bool Transporter::HandleSend(fd_set& wfds) {
     bool resend = false;
 
     if((FD_ISSET(socket, &wfds)) && (resend_soc.find(socket) == resend_soc.end())) {
-      if(!_connection->Write(client, req._msg)) {
+      if(!client->GetConnection()->Write(client, req._msg)) {
         resend = true;
         resend_soc.insert(socket);
       }
@@ -123,7 +171,7 @@ bool Transporter::HandleSend(fd_set& wfds) {
 int Transporter::Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects) {
   struct timeval timeout;
   timeout.tv_sec = 0;
-  timeout.tv_usec = SELECT_TIMEOUT_IN_MS * 1000;
+  timeout.tv_usec = TRANSPORTER_SELECT_TIMEOUT_IN_MS * 1000;
 
   int max_fd = -1;
 
@@ -137,7 +185,6 @@ int Transporter::Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<
 
   if(max_fd < 0)
     return -1;
-
   int res = select(max_fd +1, &rfds, &wfds, NULL, &timeout);
   if(res < 0 )
     DLOG(warn, "Transporter : select failed");

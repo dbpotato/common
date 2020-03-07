@@ -46,6 +46,10 @@ int SocketObject::Handle() {
   return _raw_handle;
 }
 
+std::shared_ptr<Connection> SocketObject::GetConnection() {
+  return _connection;
+}
+
 std::shared_ptr<SessionInfo> SocketObject::GetSession() {
   return _session;
 }
