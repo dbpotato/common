@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,7 +25,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Logger.h"
 
 #include <cstdio>
-
 
 PosixThread::PosixThread()
     : _id(0)
@@ -59,6 +58,13 @@ bool PosixThread::Run(std::weak_ptr<ThreadObject> obj, int id) {
     return false;
   }
   return true;
+}
+
+bool PosixThread::OnSameThread() {
+  if(_is_running) {
+    return (pthread_equal(_thread, pthread_self()));
+  }
+  return false;
 }
 
 std::weak_ptr<ThreadObject> PosixThread::GetObj() {

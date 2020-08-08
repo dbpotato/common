@@ -63,5 +63,8 @@ bool SocketObject::IsActive() {
 }
 
 void SocketObject::SetActive(bool is_active) {
-  _is_active = is_active;
+  if(_is_active != is_active) {
+    _is_active = is_active;
+    _connection->NotifySocketActiveChanged(shared_from_this());
+  }
 }

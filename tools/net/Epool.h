@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2020 Adam Kaniewski
+Copyright (c) 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,43 +23,46 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "PosixThread.h"
+
 #include <memory>
+#include <vector>
 
-static const double CONNECT_TIMEOUT_IN_MS = 300.0;
-static const int DEFAULT_SOCKET = -1;
 
-enum NetError {
-  OK = 0,
-  RETRY,
-  TIMEOUT,
-  FAILED
+class SocketObject;
+
+
+class SocketEventListener {
+public :
+  class Event {
+  public:
+    Event(uint32_t flags);
+    bool CanRead();
+    bool CanWrite();
+    bool Closed();
+  private:
+    uint32_t _flags;
+  };
+
+  virtual void OnSocketEvents(std::vector<std::pair<int, Event>>& events) = 0;
 };
 
-class Data {
+class Epool : public std::enable_shared_from_this<Epool>
+            , public ThreadObject {
 public:
-  uint32_t _size;
-  std::shared_ptr<unsigned char> _data;
-  Data() : _size(0) {}
-};
+  Epool();
+  bool Init(std::weak_ptr<SocketEventListener> listener);
+  void OnThreadStarted(int thread_id) override;
 
-template<class T>
-class LockablePtr {
+  bool AddSocket(int socket_fd);
+  void RemoveSocket(int socket_fd);
+  void SetFlags(int socket_fd, bool can_read, bool can_write);
+  bool SameThread();
+
 private:
-  std::weak_ptr<T> _weak;
-  std::shared_ptr<T> _shared;
-public:
-  LockablePtr(std::weak_ptr<T> ptr) : _weak(ptr){}
-
-  std::shared_ptr<T> Get() {
-    return _shared;
-  }
-
-  std::shared_ptr<T> Lock() {
-    _shared = _weak.lock();
-    return _shared;
-  }
-
-  void Unlock() {
-    _shared.reset();
-  }
+  void WaitForEvents();
+  void Notify();
+  int _epool_fd;
+  PosixThread _run_thread;
+  std::weak_ptr<SocketEventListener> _listener;
 };

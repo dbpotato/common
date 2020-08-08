@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2020 Adam Kaniewski
+Copyright (c) 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,43 +23,38 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "PosixThread.h"
+#include "Collector.h"
+#include "Utils.h"
+
 #include <memory>
+#include <mutex>
+#include <condition_variable>
 
-static const double CONNECT_TIMEOUT_IN_MS = 300.0;
-static const int DEFAULT_SOCKET = -1;
 
-enum NetError {
-  OK = 0,
-  RETRY,
-  TIMEOUT,
-  FAILED
-};
+class Client;
 
-class Data {
+class ConnectThread : public std::enable_shared_from_this<ConnectThread>
+                    , public ThreadObject {
 public:
-  uint32_t _size;
-  std::shared_ptr<unsigned char> _data;
-  Data() : _size(0) {}
-};
+  static std::shared_ptr<ConnectThread> GetInstance();
+  ~ConnectThread();
+  void AddClient(std::shared_ptr<Client> client);
+  void OnThreadStarted(int thread_id) override;
 
-template<class T>
-class LockablePtr {
 private:
-  std::weak_ptr<T> _weak;
-  std::shared_ptr<T> _shared;
-public:
-  LockablePtr(std::weak_ptr<T> ptr) : _weak(ptr){}
+  ConnectThread();
+  void Init();
+  void WaitOnCondition();
+  void Notify();
+  void ConnectClients();
+  void OnConnectComplete(std::shared_ptr<Client>, NetError err);
 
-  std::shared_ptr<T> Get() {
-    return _shared;
-  }
+  static std::weak_ptr<ConnectThread> _instance;
 
-  std::shared_ptr<T> Lock() {
-    _shared = _weak.lock();
-    return _shared;
-  }
-
-  void Unlock() {
-    _shared.reset();
-  }
+  PosixThread _run_thread;
+  Collector<std::shared_ptr<Client>> _clients;
+  std::condition_variable _condition;
+  std::mutex _condition_mutex;
+  bool _is_ready;
 };

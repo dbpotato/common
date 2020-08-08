@@ -29,6 +29,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "SocketObject.h"
 #include "SocketContext.h"
 #include "Transporter.h"
+#include "ConnectThread.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -77,7 +78,7 @@ void Connection::CreateClient(int port,
                           mgr));
 
   client->SetContext(CreateSocketContext(false));
-  AddUnfinishedClient(client);
+  _connector->AddClient(client);
 }
 
 std::shared_ptr<Server> Connection::CreateServer(int port,
@@ -91,7 +92,8 @@ std::shared_ptr<Server> Connection::CreateServer(int port,
 
   server.reset(new Server(socket, shared_from_this(), listeners, is_raw));
   server->Init();
-  AddSocket(server);
+  _transporter->AddSocket(server);
+  _transporter->EnableSocket(server);
   return server;
 }
 
@@ -194,11 +196,18 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
                           {},//url
                           server));
   client->SetContext(CreateSocketContext(true));
-  AddUnfinishedClient(client);
+  _connector->AddClient(client);
 }
 
 NetError Connection::AfterSocketAccepted(std::shared_ptr<SocketObject> obj) {
   return NetError::OK;
+}
+
+void Connection::NotifySocketActiveChanged(std::shared_ptr<SocketObject> obj) {
+  if(obj->IsActive())
+    _transporter->EnableSocket(obj);
+  else
+    _transporter->DisableSocket(obj);
 }
 
 void Connection::Close(SocketObject* obj) {
@@ -217,21 +226,24 @@ void Connection::Read(std::shared_ptr<Client> obj) {
   int read_len = 0;
   unsigned char buff[SOC_READ_BUFF_SIZE];
 
-  bool res = SocketRead(obj, buff, SOC_READ_BUFF_SIZE, read_len);
+  do {
+    bool res = SocketRead(obj, buff, SOC_READ_BUFF_SIZE, read_len);
 
-  if (!res) {
-    obj->OnConnectionClosed();
-    return;
-  }
+    if (!res) {
+      _transporter->DisableSocket(obj);
+      obj->OnConnectionClosed();
+      return;
+    }
 
-  if(read_len) { 
-    std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len],
-                                             std::default_delete<unsigned char[]>());
-    std::memcpy(data_sptr.get(), (void*)(buff), read_len);
-    data._size = read_len;
-    data._data = data_sptr;
-    obj->OnDataRead(data);
-  }
+    if(read_len) {
+      std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len],
+                                               std::default_delete<unsigned char[]>());
+      std::memcpy(data_sptr.get(), (void*)(buff), read_len);
+      data._size = read_len;
+      data._data = data_sptr;
+      obj->OnDataRead(data);
+    }
+  } while(obj->GetContext()->HasReadPending());
 }
 
 bool Connection::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_dest_write) {
@@ -296,69 +308,13 @@ bool Connection::Write(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg
 }
 
 void Connection::Init() {
-  _transporter = Transporter::GetTransporter(shared_from_this());
+  _transporter = Transporter::GetInstance();
+  _connector = ConnectThread::GetInstance();
 }
 
 void Connection::SendMsg(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {
-  _transporter->AddSendRequest(SendRequest(obj, msg));
+  //TODO is active check
+  if(!Write(obj,msg))
+    _transporter->AddSendRequest(obj->Handle(), msg);
 }
 
-void Connection::AddSocket(std::shared_ptr<SocketObject> socket) {
-  std::lock_guard<std::mutex> lock(_socket_mutex);
-  _sockets.push_back(socket);
-}
-
-
-void Connection::AddUnfinishedClient(std::shared_ptr<Client> client) {
-  std::lock_guard<std::mutex> lock(_uf_client_mutex);
-  _unfinshed_clients.push_back(client);
-}
-
-
-void Connection::ConnectClients() {
-  std::vector<std::pair<std::shared_ptr<Client>, NetError> > _clients_to_notify;
-
-  {
-    std::lock_guard<std::mutex> lock(_uf_client_mutex);
-
-    for(auto it = _unfinshed_clients.begin(); it != _unfinshed_clients.end(); ) {
-      std::shared_ptr<Client> client = *it;
-      NetError err = client->GetContext()->Continue(client, shared_from_this());
-      if(err != NetError::RETRY) {
-        _clients_to_notify.emplace_back(client, err);
-        if(err == NetError::OK)
-          AddSocket(client);
-        it = _unfinshed_clients.erase(it);
-      }
-      else {
-        ++it;
-      }
-    }
-  }
-
-  for(auto& entry : _clients_to_notify) {
-    entry.first->OnConnected(entry.second);
-  }
-}
-
-void Connection::GetActiveSockets(std::vector<std::shared_ptr<SocketObject> >& out_objects) {
-  ConnectClients();
-  std::vector<std::shared_ptr<SocketObject> > objects;
-  {
-    std::lock_guard<std::mutex> lock(_socket_mutex);
-
-    for(auto it = _sockets.begin(); it != _sockets.end(); ){
-      if(auto obj = it->lock()) {
-        if(obj->IsActive())
-          objects.push_back(obj);
-        ++it;
-      }
-      else {
-        it = _sockets.erase(it);
-      }
-    }
-  }
-
-  if(objects.size())
-    out_objects.insert(out_objects.end(), objects.begin(), objects.end());
-}

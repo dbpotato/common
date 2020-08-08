@@ -64,8 +64,7 @@ SocketContext::~SocketContext() {
     freeaddrinfo(_info);
 }
 
-NetError SocketContext::Continue(std::shared_ptr<Client> client,
-                                 std::shared_ptr<Connection> connection) {
+NetError SocketContext::Continue(std::shared_ptr<Client> client) {
   auto start = std::chrono::system_clock::now();
   switch (_state) {
     case GETTING_INFO:
@@ -75,10 +74,10 @@ NetError SocketContext::Continue(std::shared_ptr<Client> client,
       Connect(client);
       break;
     case AFTER_CONNECTING:
-      AfterConnect(client, connection);
+      AfterConnect(client);
       break;
     case AFTER_ACCEPTING:
-      AfterAccept(client, connection);
+      AfterAccept(client);
       break;
     default:
       break;
@@ -149,14 +148,14 @@ void SocketContext::Connect(std::shared_ptr<Client> client) {
   }
 }
 
-void SocketContext::AfterConnect(std::shared_ptr<Client> client,
-                                   std::shared_ptr<Connection> connection) {
+void SocketContext::AfterConnect(std::shared_ptr<Client> client) {
+  auto connection = client->GetConnection();
   NetError err = connection->AfterSocketCreated(client);
   ErrToState(err);
 }
 
-void SocketContext::AfterAccept(std::shared_ptr<Client> client,
-                                  std::shared_ptr<Connection> connection) {
+void SocketContext::AfterAccept(std::shared_ptr<Client> client) {
+  auto connection = client->GetConnection();
   NetError err = connection->AfterSocketAccepted(client);
   ErrToState(err);
 }

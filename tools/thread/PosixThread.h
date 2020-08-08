@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -46,6 +46,7 @@ protected:
 public:
   PosixThread();
   bool Run(std::weak_ptr<ThreadObject> obj, int id = 0);
+  bool OnSameThread();
   std::weak_ptr<ThreadObject> GetObj();
   void Stop();
   std::atomic_bool& IsRunning();

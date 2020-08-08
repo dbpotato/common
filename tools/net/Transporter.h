@@ -26,10 +26,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Collector.h"
 #include "PosixThread.h"
 #include "Utils.h"
+#include "Epool.h"
 
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <map>
 #include <sys/select.h>
 
 class Connection;
@@ -38,38 +40,37 @@ class Message;
 class SocketObject;
 
 
-struct SendRequest {
-  LockablePtr<Client> _obj;
-  std::shared_ptr<Message> _msg;
-  SendRequest(std::weak_ptr<Client> obj, std::shared_ptr<Message> msg)
-      : _obj(obj)
-      , _msg(msg){}
+class SocketInfo {
+public:
+  SocketInfo(std::weak_ptr<SocketObject> object);
+  std::shared_ptr<SocketObject> lock();
+
+  std::weak_ptr<SocketObject> _object;
+  bool _pending_read;
+  bool _pending_write;
+  bool _active;
 };
 
 class Transporter : public std::enable_shared_from_this<Transporter>
-                  , public ThreadObject {
+                  , public SocketEventListener {
 public:
-  static std::shared_ptr<Transporter> GetTransporter(std::weak_ptr<Connection>);
-  ~Transporter();
-  void AddSendRequest(SendRequest req);
-  void OnThreadStarted(int thread_id) override;
+  static std::shared_ptr<Transporter> GetInstance();
+  void AddSendRequest(int socket_fd, std::shared_ptr<Message> msg);
+  void AddSocket(std::shared_ptr<SocketObject> socket_obj);
+  void RemoveSocket(int socket_fd);
+  void RemoveSocket(std::shared_ptr<SocketObject> socket_obj);
+  void EnableSocket(std::shared_ptr<SocketObject> socket_obj);
+  void DisableSocket(std::shared_ptr<SocketObject> socket_obj);
+  void OnSocketEvents(std::vector<std::pair<int, SocketEventListener::Event>>& events) override;
+  void SendPending(std::vector<std::shared_ptr<Client>>& clients);
 
 private:
   Transporter();
   void Init();
-  void UpdateSendRequests();
-  void Prepare(std::vector<std::shared_ptr<SocketObject> >& objects);
-  bool Process(std::vector<std::shared_ptr<SocketObject> >& objects); 
-  int Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects);
-  int HandleReceive(std::vector<std::shared_ptr<SocketObject> >& objects, fd_set& rfds);
-  bool HandleSend(fd_set& wfds);
-
-  void AddConnection(std::weak_ptr<Connection>);
-
-  Collector<SendRequest> _collector;
-  std::vector<std::weak_ptr<Connection> > _connections;
-  std::vector<SendRequest> _req_vec;
+  std::map<int, std::vector<std::shared_ptr<Message>>> _write_reqs;
+  std::mutex _write_mutex;
   static std::weak_ptr<Transporter> _instance;
-  PosixThread _run_thread;
-  std::mutex _conn_mutex;
+  std::map<int, SocketInfo> _sockets;
+  std::shared_ptr<Epool> _epool;
+  std::mutex _socket_mutex;
 };

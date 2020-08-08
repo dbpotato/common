@@ -38,6 +38,7 @@ class ClientOwner;
 class Server;
 class SocketContext;
 class Transporter;
+class ConnectThread;
 
 
 class Connection : public std::enable_shared_from_this<Connection> {
@@ -61,6 +62,8 @@ public: //TODO
 
   void SendMsg(std::shared_ptr<Client>, std::shared_ptr<Message> msg);
   void Accept(std::shared_ptr<SocketObject> obj);
+  void NotifySocketActiveChanged(std::shared_ptr<SocketObject> obj);
+
   void GetActiveSockets(std::vector<std::shared_ptr<SocketObject> >& out_objects);
 
   virtual NetError AfterSocketCreated(std::shared_ptr<SocketObject> obj);
@@ -82,15 +85,7 @@ protected: //TODO
   void Read(std::shared_ptr<Client> obj);
   bool Write(std::shared_ptr<Client> obj, std::shared_ptr<Message>);
 
-  void AddSocket(std::shared_ptr<SocketObject> socket);
-  void AddUnfinishedClient(std::shared_ptr<Client> client);
-
-  void ConnectClients();
-
 private: //TODO
-  std::mutex _socket_mutex;
-  std::mutex _uf_client_mutex;
-  std::vector<std::weak_ptr<SocketObject> >  _sockets;
-  std::vector<std::shared_ptr<Client> > _unfinshed_clients;
   std::shared_ptr<Transporter> _transporter;
+  std::shared_ptr<ConnectThread> _connector;
 };

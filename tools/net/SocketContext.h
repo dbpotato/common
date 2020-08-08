@@ -33,6 +33,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 class Client;
 class Connection;
 
+
 class SocketContext {
 public:
   enum State {
@@ -47,16 +48,13 @@ public:
 
   SocketContext(bool from_accept);
   ~SocketContext();
-  NetError Continue(std::shared_ptr<Client> client,
-                    std::shared_ptr<Connection> connection);
+  NetError Continue(std::shared_ptr<Client> client);
   virtual bool HasReadPending() {return false;}
 private:
   void GetAddrInfo(std::shared_ptr<Client> client);
   void Connect(std::shared_ptr<Client> client);
-  void AfterConnect(std::shared_ptr<Client> client,
-                    std::shared_ptr<Connection> connection);
-  void AfterAccept(std::shared_ptr<Client> client,
-                   std::shared_ptr<Connection> connection);
+  void AfterConnect(std::shared_ptr<Client> client);
+  void AfterAccept(std::shared_ptr<Client> client);
   void SetState(State);
   void ErrToState(NetError err);
   NetError StateToError();
@@ -71,4 +69,3 @@ private:
   State _state;
   std::string _ip;
 };
-

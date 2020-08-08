@@ -34,167 +34,170 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 std::weak_ptr<Transporter> Transporter::_instance;
 
+SocketInfo::SocketInfo(std::weak_ptr<SocketObject> object)
+    : _object(object)
+    , _pending_read(false)
+    , _pending_write(false)
+    , _active(false) {
+}
+
+std::shared_ptr<SocketObject> SocketInfo::lock() {
+  return _object.lock();
+}
+
 Transporter::Transporter() {
 }
 
-Transporter::~Transporter() {
-  _run_thread.Stop();
-  _run_thread.Join();
-}
-
 void Transporter::Init() {
-  _run_thread.Run(shared_from_this(), 0);
-}
-
-void Transporter::OnThreadStarted(int thread_id) {
-
-  while(_run_thread.ShouldRun()) {
-    std::vector<std::shared_ptr<SocketObject> > active_objects;
-    Prepare(active_objects);
-    if(!Process(active_objects))
-      std::this_thread::sleep_for(std::chrono::milliseconds(TRANSPORTER_SELECT_TIMEOUT_IN_MS));
-    else
-      std::this_thread::sleep_for(std::chrono::microseconds(TRANSPORTER_SLEEP_IN_US));
+  _epool = std::make_shared<Epool>();
+  if(!_epool->Init(shared_from_this())) {
+    DLOG(error, "Transporter : Init epool failed");
   }
 }
 
-std::shared_ptr<Transporter> Transporter::GetTransporter(std::weak_ptr<Connection> conn) {
+void Transporter::AddSocket(std::shared_ptr<SocketObject> socket_obj) {
+  std::lock_guard<std::mutex> lock(_socket_mutex);
+  if(!_epool->AddSocket(socket_obj->Handle())) {
+    DLOG(error, "Transporter : Add socket to epool failed");
+  }
+  _sockets.insert(std::make_pair(socket_obj->Handle(), SocketInfo(socket_obj)));
+}
+
+void Transporter::RemoveSocket(int socket_fd) {
+  std::lock_guard<std::mutex> lock(_socket_mutex);
+
+
+  _sockets.erase(socket_fd);
+
+  _epool->RemoveSocket(socket_fd);
+}
+
+void Transporter::RemoveSocket(std::shared_ptr<SocketObject> socket_obj) {
+  std::lock_guard<std::mutex> lock_s(_socket_mutex);
+  std::lock_guard<std::mutex> lock_w(_write_mutex);
+  _write_reqs.erase(socket_obj->Handle());
+  _sockets.erase(socket_obj->Handle());
+  _epool->RemoveSocket(socket_obj->Handle());
+}
+
+void Transporter::EnableSocket(std::shared_ptr<SocketObject> socket_obj) {
+  auto socket_it =_sockets.find(socket_obj->Handle());
+  if(socket_it != _sockets.end()) {
+     SocketInfo& wrapper = socket_it->second;
+     if(!wrapper._active) {
+       wrapper._active = true;
+       if(wrapper._pending_read) {
+         wrapper._pending_read = false;
+         socket_obj->GetConnection()->ProcessSocket(socket_obj);
+       }
+       _epool->SetFlags(socket_obj->Handle(), true, false);
+     }
+  }
+}
+
+void Transporter::DisableSocket(std::shared_ptr<SocketObject> socket_obj) {
+  auto socket_it =_sockets.find(socket_obj->Handle());
+  if(socket_it != _sockets.end()) {
+     SocketInfo& wrapper = socket_it->second;
+     if(wrapper._active) {
+       wrapper._active = false;
+       _epool->SetFlags(socket_obj->Handle(), false, false);
+     }
+  }
+}
+
+void Transporter::OnSocketEvents(std::vector<std::pair<int, SocketEventListener::Event>>& events) {
+   std::set<int> closed_sockets;
+   std::vector<std::shared_ptr<SocketObject>> read_sockets;
+   std::vector<std::shared_ptr<Client>> write_clients;
+   std::vector<std::shared_ptr<Client>> closed_clients;
+
+   {
+     std::lock_guard<std::mutex> lock(_socket_mutex);
+     for(auto& pair : events) {
+       auto& event = pair.second;
+       auto socket_it =_sockets.find(pair.first);
+       if(socket_it == _sockets.end()){
+         closed_sockets.insert(pair.first); //TODO needed ?
+         continue;
+       }
+       auto wrapper = socket_it->second;
+       auto socket_obj = wrapper.lock();
+       if(!socket_obj) {
+         closed_sockets.insert(pair.first);
+         continue;
+       }
+
+       if(event.CanRead()) {
+         if(socket_obj->IsActive())
+           read_sockets.push_back(socket_obj);
+         else
+           wrapper._pending_read = true;
+       }
+       if(event.CanWrite()) {
+         if(!socket_obj->IsServerSocket()) {
+             write_clients.push_back(std::static_pointer_cast<Client>(socket_obj));
+         }
+       }
+       if(event.Closed()) {
+         if(!socket_obj->IsServerSocket()) {
+           closed_clients.push_back(std::static_pointer_cast<Client>(socket_obj));
+         }
+       }
+     }
+   }
+
+   for(auto obj : read_sockets) {
+     obj->GetConnection()->ProcessSocket(obj);
+   }
+   if(write_clients.size()) {
+     SendPending(write_clients);
+   }
+   for(auto obj : closed_clients) {
+     obj->OnConnectionClosed();
+   }
+   for(auto socket_fd : closed_sockets) {
+     RemoveSocket(socket_fd);
+   }
+}
+
+void Transporter::SendPending(std::vector<std::shared_ptr<Client>>& clients) {
+  std::lock_guard<std::mutex> lock(_write_mutex);
+
+  for(auto client : clients) {
+    int socket_fd = client->Handle();
+    auto it = _write_reqs.find(socket_fd);
+    auto& req_vec = it->second;
+
+    for(auto vec_it = req_vec.begin(); vec_it != req_vec.end();) {
+      auto& msg = *vec_it;
+      if(!client->GetConnection()->Write(client, msg)) {
+        break;
+      }
+      else {
+        vec_it = req_vec.erase(vec_it);
+      }
+    }
+
+    if(!req_vec.size()) {
+      _write_reqs.erase(socket_fd);
+      _epool->SetFlags(socket_fd, true, false);
+    }
+  }
+}
+
+std::shared_ptr<Transporter> Transporter::GetInstance() {
   std::shared_ptr<Transporter> instance;
   if(!(instance =_instance.lock())) {
     instance.reset(new Transporter());
     instance->Init();
     _instance = instance;
   }
-  instance->AddConnection(conn);
   return instance;
 }
 
-void Transporter::AddConnection(std::weak_ptr<Connection> conn) {
-  std::lock_guard<std::mutex> lock(_conn_mutex);
-  _connections.emplace_back(conn);
-}
-
-void Transporter::AddSendRequest(SendRequest req) {
-  _collector.Add(req);
-}
-
-void Transporter::Prepare(std::vector<std::shared_ptr<SocketObject> >& objects) {
-  std::vector<std::shared_ptr<Connection> > connections;
-  {
-    std::lock_guard<std::mutex> lock(_conn_mutex);
-    for(auto it = _connections.begin(); it != _connections.end(); ) {
-      std::shared_ptr<Connection> conn = (*it).lock();
-      if(conn) {
-        connections.push_back(conn);
-        ++it;
-      }
-      else
-        it = _connections.erase(it);
-    }
-  }
-
-  for(auto conn : connections) {
-    conn->GetActiveSockets(objects);
-  }
-}
-
-bool Transporter::Process(std::vector<std::shared_ptr<SocketObject> >& objects) {
-  fd_set rfds, wfds;
-  FD_ZERO(&rfds);
-  FD_ZERO(&wfds);
-
-  int res = Select(rfds, wfds, objects);
-
-  if(res < 0 ) {
-    return false;
-  }
-
-  UpdateSendRequests();
-  int msgs_received = HandleReceive(objects, rfds);
-  bool msgs_sent = HandleSend(wfds);
-  return ( msgs_received || msgs_sent || !res );
-}
-
-void Transporter::UpdateSendRequests() {
-
-  std::vector<SendRequest> vec;
-  _collector.Collect(vec);
-  _req_vec.insert(_req_vec.end(), vec.begin(), vec.end());
-
-  if(_req_vec.size()) {
-    for(size_t i = _req_vec.size() -1; ; --i) {
-      if(!_req_vec.at(i)._obj.Lock())
-        _req_vec.erase(_req_vec.begin() + i);
-      if(!i)
-        break;
-    }
-  }
-}
-
-int Transporter::HandleReceive(std::vector<std::shared_ptr<SocketObject> >& objects, fd_set& rfds) {
-  int processed = 0;
-
-  for(auto obj : objects) {
-    if(FD_ISSET(obj->Handle(), &rfds) ||
-        (obj->GetContext() && obj->GetContext()->HasReadPending())) {
-      obj->GetConnection()->ProcessSocket(obj);
-      ++processed;
-    }
-  }
-
-  return processed;
-}
-
-bool Transporter::HandleSend(fd_set& wfds) {
-  std::vector<SendRequest> resend_vec;
-  std::set<int> resend_soc;
-
-  if(!_req_vec.size())
-    return false;
-
-  for(auto req : _req_vec) {
-    auto client = req._obj.Get();
-    int socket = client->Handle();
-    bool resend = false;
-
-    if((FD_ISSET(socket, &wfds)) && (resend_soc.find(socket) == resend_soc.end())) {
-      if(!client->GetConnection()->Write(client, req._msg)) {
-        resend = true;
-        resend_soc.insert(socket);
-      }
-    }
-    else
-      resend = true;
-
-    if(resend) {
-      req._obj.Unlock();
-      resend_vec.push_back(req);
-    }
-  }
-
-  _req_vec = resend_vec;
-  return true;
-}
-
-int Transporter::Select(fd_set& rfds, fd_set& wfds, std::vector<std::shared_ptr<SocketObject> >& objects) {
-  struct timeval timeout;
-  timeout.tv_sec = 0;
-  timeout.tv_usec = TRANSPORTER_SELECT_TIMEOUT_IN_MS * 1000;
-
-  int max_fd = -1;
-
-  for(auto obj : objects) {
-    int fd = obj->Handle();
-    FD_SET(fd, &rfds);
-    FD_SET(fd, &wfds);
-    if(fd > max_fd)
-      max_fd = fd;
-  }
-
-  if(max_fd < 0)
-    return -1;
-  int res = select(max_fd +1, &rfds, &wfds, NULL, &timeout);
-  if(res < 0 )
-    DLOG(warn, "Transporter : select failed");
-  return res;
+void Transporter::AddSendRequest(int socket_fd, std::shared_ptr<Message> msg) {
+  std::lock_guard<std::mutex> lock(_write_mutex);
+  _write_reqs[socket_fd].push_back(msg);
+  _epool->SetFlags(socket_fd, true, true);
 }
