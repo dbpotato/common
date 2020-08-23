@@ -111,7 +111,14 @@ void SocketContext::GetAddrInfo(std::shared_ptr<Client> client) {
 void SocketContext::Connect(std::shared_ptr<Client> client) {
   if(_socket_handle == DEFAULT_SOCKET) {
     _socket_handle = socket(_info_next->ai_family, _info_next->ai_socktype, _info_next->ai_protocol);
-    fcntl(_socket_handle, F_SETFL, O_NONBLOCK);
+    if(_socket_handle != DEFAULT_SOCKET) {
+      fcntl(_socket_handle, F_SETFL, O_NONBLOCK);
+    }
+    else {
+      DLOG(error, "SocketContext: create socket failed");
+      SetState(FAILED);
+      return;
+    }
   }
 
   if (_socket_handle != DEFAULT_SOCKET) {
