@@ -43,10 +43,12 @@ public:
  void SetContext(std::shared_ptr<SocketContext> context);
  bool IsActive();
  void SetActive(bool is_active);
+ virtual void OnConnectionClosed();
 protected:
  int _raw_handle;
  bool _is_server_socket;
  bool _is_active;
+ bool _was_handle_closed;
  std::shared_ptr<SocketContext> _context;
  std::shared_ptr<Connection> _connection;
 };

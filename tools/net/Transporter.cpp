@@ -57,27 +57,34 @@ void Transporter::Init() {
 
 void Transporter::AddSocket(std::shared_ptr<SocketObject> socket_obj) {
   std::lock_guard<std::mutex> lock(_socket_mutex);
-  if(!_epool->AddSocket(socket_obj->Handle())) {
-    DLOG(error, "Transporter : Add socket to epool failed");
+  int socket_fd = socket_obj->Handle();
+  auto socket_it =_sockets.find(socket_fd);
+  if(socket_it !=_sockets.end()) {
+     DLOG(warn, "Transporter : Replacing socket object : {}", socket_fd);
+    _epool->RemoveSocket(socket_fd);
+    socket_it->second = SocketInfo(socket_obj);
   }
-  _sockets.insert(std::make_pair(socket_obj->Handle(), SocketInfo(socket_obj)));
+  else {
+    _sockets.insert(std::make_pair(socket_fd, SocketInfo(socket_obj)));
+  }
+  if(!_epool->AddSocket(socket_fd)) {
+    DLOG(error, "Transporter : Add socket to epool failed : {}", socket_fd);
+  }
 }
 
 void Transporter::RemoveSocket(int socket_fd) {
   std::lock_guard<std::mutex> lock(_socket_mutex);
-
-
   _sockets.erase(socket_fd);
-
   _epool->RemoveSocket(socket_fd);
 }
 
 void Transporter::RemoveSocket(std::shared_ptr<SocketObject> socket_obj) {
   std::lock_guard<std::mutex> lock_s(_socket_mutex);
   std::lock_guard<std::mutex> lock_w(_write_mutex);
-  _write_reqs.erase(socket_obj->Handle());
-  _sockets.erase(socket_obj->Handle());
-  _epool->RemoveSocket(socket_obj->Handle());
+  int socket_fd = socket_obj->Handle();
+  _write_reqs.erase(socket_fd);
+  _sockets.erase(socket_fd);
+  _epool->RemoveSocket(socket_fd);
 }
 
 void Transporter::EnableSocket(std::shared_ptr<SocketObject> socket_obj) {
@@ -93,6 +100,9 @@ void Transporter::EnableSocket(std::shared_ptr<SocketObject> socket_obj) {
        _epool->SetFlags(socket_obj->Handle(), true, false);
      }
   }
+  else {
+    DLOG(error,"Transporter : EnableSocket - fd not found : {}", socket_obj->Handle());
+  }
 }
 
 void Transporter::DisableSocket(std::shared_ptr<SocketObject> socket_obj) {
@@ -103,6 +113,9 @@ void Transporter::DisableSocket(std::shared_ptr<SocketObject> socket_obj) {
        wrapper._active = false;
        _epool->SetFlags(socket_obj->Handle(), false, false);
      }
+  }
+  else {
+    DLOG(error,"Transporter : DisableSocket - fd not found : {}", socket_obj->Handle());
   }
 }
 
@@ -115,16 +128,20 @@ void Transporter::OnSocketEvents(std::vector<std::pair<int, SocketEventListener:
    {
      std::lock_guard<std::mutex> lock(_socket_mutex);
      for(auto& pair : events) {
-       auto& event = pair.second;
-       auto socket_it =_sockets.find(pair.first);
-       if(socket_it == _sockets.end()){
-         closed_sockets.insert(pair.first); //TODO needed ?
+       int socket_fd = pair.first;
+       SocketEventListener::Event& event = pair.second;
+
+       auto socket_it =_sockets.find(socket_fd);
+       if(socket_it == _sockets.end()) { //TODO needed ?
+         DLOG(warn, "Transporter : OnSocketEvents - SocketObject not found : {}", socket_fd);
+         closed_sockets.insert(socket_fd);
          continue;
        }
        auto wrapper = socket_it->second;
        auto socket_obj = wrapper.lock();
-       if(!socket_obj) {
-         closed_sockets.insert(pair.first);
+       if(!socket_obj) { //TODO needed ?
+         DLOG(warn, "Transporter : OnSocketEvents - SocketObject already released : {}", socket_fd);
+         closed_sockets.insert(socket_fd);
          continue;
        }
 

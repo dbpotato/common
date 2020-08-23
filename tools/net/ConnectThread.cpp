@@ -112,6 +112,7 @@ void ConnectThread::OnConnectComplete(std::shared_ptr<Client> client, NetError e
     transporter->AddSocket(client);
   }
   client->OnConnected(err);
-  if(client->IsActive())
+  if(client->IsActive() && (err == NetError::OK)) {
     transporter->EnableSocket(client);
+  }
 }

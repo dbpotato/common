@@ -31,11 +31,13 @@ SocketObject::SocketObject(int raw_handle,
     : _raw_handle(raw_handle)
     , _is_server_socket(is_server_socket)
     , _is_active(true)
+    , _was_handle_closed(false)
     , _connection(connection) {
 }
 
 SocketObject::~SocketObject() {
-  _connection->Close(this);
+  if(!_was_handle_closed)
+    _connection->Close(this);
 }
 
 bool SocketObject::IsServerSocket() {
@@ -67,4 +69,8 @@ void SocketObject::SetActive(bool is_active) {
     _is_active = is_active;
     _connection->NotifySocketActiveChanged(shared_from_this());
   }
+}
+
+void SocketObject::OnConnectionClosed() {
+  _was_handle_closed = true;
 }

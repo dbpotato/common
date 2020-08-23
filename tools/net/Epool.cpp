@@ -44,9 +44,8 @@ bool SocketEventListener::Event::CanWrite() {
 }
 
 bool SocketEventListener::Event::Closed() {
-  return(_flags & EPOLLERR ||
-         _flags & EPOLLHUP ||
-         ((!_flags) & EPOLLIN));
+  return((_flags & EPOLLERR) ||
+         (_flags & EPOLLHUP));
 }
 
 

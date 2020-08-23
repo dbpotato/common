@@ -55,7 +55,7 @@ public:
 
   void OnMsgWrite(std::shared_ptr<Message> msg, bool status);
   void OnDataRead(Data& data);
-  void OnConnectionClosed();
+  void OnConnectionClosed() override;
   void OnConnected(NetError err);
 
   int GetId();

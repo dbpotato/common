@@ -137,6 +137,7 @@ void Client::OnDataRead(Data& data) {
 }
 
 void Client::OnConnectionClosed() {
+  SocketObject::OnConnectionClosed();
   if(auto manager = _manager.lock())
     manager->OnClientClosed(SharedPtr());
 }

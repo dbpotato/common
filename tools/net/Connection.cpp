@@ -230,8 +230,9 @@ void Connection::Read(std::shared_ptr<Client> obj) {
     bool res = SocketRead(obj, buff, SOC_READ_BUFF_SIZE, read_len);
 
     if (!res) {
-      _transporter->DisableSocket(obj);
+      _transporter->RemoveSocket(obj);
       obj->OnConnectionClosed();
+      Close(obj.get());
       return;
     }
 
