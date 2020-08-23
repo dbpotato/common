@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2020 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -27,6 +27,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <spdlog/spdlog.h>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 static const char* DEFAULT_LOGGER_PATTERN = "[%H:%M:%S:%e] [%t] [%l] %v";
 
 class func_sink : public spdlog::sinks::sink {
@@ -50,8 +54,12 @@ public:
         _log_func(msg.level, std::string(msg.formatted.data(), msg.formatted.size() - 1), _log_func_arg);
     }
     else{
+#ifdef __ANDROID__
+      __android_log_print(ANDROID_LOG_ERROR  , "", "%s", std::string(msg.formatted.data(), msg.formatted.size() - 1).c_str());
+#else
       fwrite(msg.formatted.data(), sizeof(char), msg.formatted.size(), stdout);
       flush();
+#endif
     }
   }
 protected:
