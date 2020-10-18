@@ -29,9 +29,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #ifdef __ANDROID__
 #include <android/log.h>
+
+static const char* DEFAULT_LOGGER_PATTERN  = "%v";
+static const char* DEFAULT_ANDROID_LOG_TAG = "Logger";
+#else
+static const char* DEFAULT_LOGGER_PATTERN = "[%H:%M:%S:%e] [%t] [%l] %v";
 #endif
 
-static const char* DEFAULT_LOGGER_PATTERN = "[%H:%M:%S:%e] [%t] [%l] %v";
 
 class func_sink : public spdlog::sinks::sink {
 public:
@@ -55,7 +59,10 @@ public:
     }
     else{
 #ifdef __ANDROID__
-      __android_log_print(ANDROID_LOG_ERROR  , "", "%s", std::string(msg.formatted.data(), msg.formatted.size() - 1).c_str());
+      __android_log_print(android_log_level(msg.level),
+                          DEFAULT_ANDROID_LOG_TAG,
+                          "%s",
+                          std::string(msg.formatted.data(), msg.formatted.size() - 1).c_str());
 #else
       fwrite(msg.formatted.data(), sizeof(char), msg.formatted.size(), stdout);
       flush();
@@ -66,7 +73,26 @@ protected:
   void flush() override {
     fflush(stdout);
   }
-
+#ifdef __ANDROID__
+  android_LogPriority android_log_level(spdlog::level::level_enum level){
+    switch (level) {
+      case spdlog::level::trace:
+        return ANDROID_LOG_VERBOSE;
+      case spdlog::level::debug:
+        return ANDROID_LOG_DEBUG;
+      case spdlog::level::info:
+        return ANDROID_LOG_INFO;
+      case spdlog::level::warn:
+        return ANDROID_LOG_WARN;
+      case spdlog::level::err:
+        return ANDROID_LOG_ERROR;
+      case spdlog::level::critical:
+        return ANDROID_LOG_FATAL;
+      default:
+        return ANDROID_LOG_DEFAULT;
+    }
+  }
+#endif 
   std::mutex _mutex;
   void(*_log_func)(spdlog::level::level_enum, const std::string&, void*);
   void* _log_func_arg;
