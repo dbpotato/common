@@ -169,7 +169,7 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
 
   std::shared_ptr<Server> server = std::static_pointer_cast<Server>(obj);
 
-  int socket = accept(server->Handle(), &client_addr, &client_addr_len);
+  int socket = accept(server->SocketFd(), &client_addr, &client_addr_len);
   if(socket < 0) {
     DLOG(warn, "Connection::Accept fail");
     return;
@@ -211,7 +211,7 @@ void Connection::NotifySocketActiveChanged(std::shared_ptr<SocketObject> obj) {
 }
 
 void Connection::Close(SocketObject* obj) {
-  close(obj->Handle());
+  close(obj->SocketFd());
 }
 
 void Connection::ProcessSocket(std::shared_ptr<SocketObject> obj) {
@@ -248,12 +248,12 @@ void Connection::Read(std::shared_ptr<Client> obj) {
 }
 
 bool Connection::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_dest_write) {
-  out_dest_write = read(obj->Handle(), dest, dest_size);
+  out_dest_write = read(obj->SocketFd(), dest, dest_size);
   return out_dest_write > 0;
 }
 
 bool Connection::SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size) {
-  out_write_size = write(obj->Handle(), buffer, size);
+  out_write_size = write(obj->SocketFd(), buffer, size);
   return out_write_size > 0;
 }
 
@@ -316,6 +316,6 @@ void Connection::Init() {
 void Connection::SendMsg(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {
   //TODO is active check
   if(!Write(obj,msg))
-    _transporter->AddSendRequest(obj->Handle(), msg);
+    _transporter->AddSendRequest(obj->SocketFd(), msg);
 }
 

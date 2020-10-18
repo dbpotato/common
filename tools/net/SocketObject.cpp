@@ -25,10 +25,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Connection.h"
 
 
-SocketObject::SocketObject(int raw_handle,
+SocketObject::SocketObject(int socket_fd,
                            bool is_server_socket,
                            std::shared_ptr<Connection> connection)
-    : _raw_handle(raw_handle)
+    : _socket_fd(socket_fd)
     , _is_server_socket(is_server_socket)
     , _is_active(true)
     , _was_handle_closed(false)
@@ -44,8 +44,8 @@ bool SocketObject::IsServerSocket() {
   return _is_server_socket;
 }
 
-int SocketObject::Handle() {
-  return _raw_handle;
+int SocketObject::SocketFd() {
+  return _socket_fd;
 }
 
 std::shared_ptr<SocketContext> SocketObject::GetContext() {

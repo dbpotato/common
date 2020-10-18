@@ -55,13 +55,13 @@ uint32_t Client::NextId() {
   return ++_id_counter;
 }
 
-Client::Client(int raw_handle,
+Client::Client(int socket_fd,
                std::shared_ptr<Connection> connection,
                const std::string& ip,
                int port,
                const std::string& url,
                std::weak_ptr<ClientManager> manager)
-    : SocketObject(raw_handle, false, connection)
+    : SocketObject(socket_fd, false, connection)
     , _ip(ip)
     , _port(port)
     , _url(url)
@@ -72,7 +72,7 @@ Client::Client(int raw_handle,
 }
 
 void Client::Update(int socket, const std::string& ip) {
-  _raw_handle = socket;
+  _socket_fd = socket;
   _ip = ip;
 }
 
@@ -80,7 +80,7 @@ void Client::SetManager(std::weak_ptr<ClientManager> manager) {
   _manager = manager;
 }
 
-int Client::GetId() {
+uint32_t Client::GetId() {
   return _id;
 }
 
@@ -141,5 +141,3 @@ void Client::OnConnectionClosed() {
   if(auto manager = _manager.lock())
     manager->OnClientClosed(SharedPtr());
 }
-
-

@@ -58,7 +58,7 @@ public:
   void OnConnectionClosed() override;
   void OnConnected(NetError err);
 
-  int GetId();
+  uint32_t GetId();
   const std::string& GetUrl();
   const std::string& GetIp();
   int GetPort();
@@ -70,7 +70,7 @@ protected:
   static uint32_t NextId();
   static std::atomic<uint32_t> _id_counter;
 private:
-  Client(int raw_handle,
+  Client(int socket_fd,
          std::shared_ptr<Connection> connection,
          const std::string& ip = {},
          int port = DEFAULT_SOCKET,

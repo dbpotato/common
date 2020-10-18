@@ -124,7 +124,7 @@ NetError ConnectionSSL::AfterSocketCreated(std::shared_ptr<SocketObject> obj) {
   auto ssl_handle = context->SSLHandle();
   if(!ssl_handle) {
     ssl_handle = SSL_new(_ctx);
-    SSL_set_fd(ssl_handle, obj->Handle());
+    SSL_set_fd(ssl_handle, obj->SocketFd());
     context->SetSSLHandle(ssl_handle);
   }
 
@@ -149,7 +149,7 @@ NetError ConnectionSSL::AfterSocketAccepted(std::shared_ptr<SocketObject> obj) {
   auto ssl_handle = context->SSLHandle();
   if(!ssl_handle) {
     ssl_handle = SSL_new(_ctx);
-    SSL_set_fd(ssl_handle, obj->Handle());
+    SSL_set_fd(ssl_handle, obj->SocketFd());
     context->SetSSLHandle(ssl_handle);
   }
 

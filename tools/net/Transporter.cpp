@@ -57,7 +57,7 @@ void Transporter::Init() {
 
 void Transporter::AddSocket(std::shared_ptr<SocketObject> socket_obj) {
   std::lock_guard<std::mutex> lock(_socket_mutex);
-  int socket_fd = socket_obj->Handle();
+  int socket_fd = socket_obj->SocketFd();
   auto socket_it =_sockets.find(socket_fd);
   if(socket_it !=_sockets.end()) {
      DLOG(warn, "Transporter : Replacing socket object : {}", socket_fd);
@@ -81,14 +81,14 @@ void Transporter::RemoveSocket(int socket_fd) {
 void Transporter::RemoveSocket(std::shared_ptr<SocketObject> socket_obj) {
   std::lock_guard<std::mutex> lock_s(_socket_mutex);
   std::lock_guard<std::mutex> lock_w(_write_mutex);
-  int socket_fd = socket_obj->Handle();
+  int socket_fd = socket_obj->SocketFd();
   _write_reqs.erase(socket_fd);
   _sockets.erase(socket_fd);
   _epool->RemoveSocket(socket_fd);
 }
 
 void Transporter::EnableSocket(std::shared_ptr<SocketObject> socket_obj) {
-  auto socket_it =_sockets.find(socket_obj->Handle());
+  auto socket_it =_sockets.find(socket_obj->SocketFd());
   if(socket_it != _sockets.end()) {
      SocketInfo& wrapper = socket_it->second;
      if(!wrapper._active) {
@@ -97,25 +97,25 @@ void Transporter::EnableSocket(std::shared_ptr<SocketObject> socket_obj) {
          wrapper._pending_read = false;
          socket_obj->GetConnection()->ProcessSocket(socket_obj);
        }
-       _epool->SetFlags(socket_obj->Handle(), true, false);
+       _epool->SetFlags(socket_obj->SocketFd(), true, false);
      }
   }
   else {
-    DLOG(error,"Transporter : EnableSocket - fd not found : {}", socket_obj->Handle());
+    DLOG(error,"Transporter : EnableSocket - fd not found : {}", socket_obj->SocketFd());
   }
 }
 
 void Transporter::DisableSocket(std::shared_ptr<SocketObject> socket_obj) {
-  auto socket_it =_sockets.find(socket_obj->Handle());
+  auto socket_it =_sockets.find(socket_obj->SocketFd());
   if(socket_it != _sockets.end()) {
      SocketInfo& wrapper = socket_it->second;
      if(wrapper._active) {
        wrapper._active = false;
-       _epool->SetFlags(socket_obj->Handle(), false, false);
+       _epool->SetFlags(socket_obj->SocketFd(), false, false);
      }
   }
   else {
-    DLOG(error,"Transporter : DisableSocket - fd not found : {}", socket_obj->Handle());
+    DLOG(error,"Transporter : DisableSocket - fd not found : {}", socket_obj->SocketFd());
   }
 }
 
@@ -182,7 +182,7 @@ void Transporter::SendPending(std::vector<std::shared_ptr<Client>>& clients) {
   std::lock_guard<std::mutex> lock(_write_mutex);
 
   for(auto client : clients) {
-    int socket_fd = client->Handle();
+    int socket_fd = client->SocketFd();
     auto it = _write_reqs.find(socket_fd);
     auto& req_vec = it->second;
 

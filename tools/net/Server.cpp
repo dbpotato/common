@@ -47,7 +47,7 @@ void Server::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Messag
 }
 
 void Server::OnClientClosed(std::shared_ptr<Client> client) {
-  RemoveClient(client->GetId());
+  RemoveClient(client);
   for(auto listener_wp : _listeners)
     if(auto listener = listener_wp.lock())
        listener->OnClientClosed(client);
@@ -78,9 +78,9 @@ void Server::AddClient(std::shared_ptr<Client> client) {
   _clients.insert(std::make_pair(client->GetId(),client));
 }
 
-bool Server::RemoveClient(uint32_t id) {
+bool Server::RemoveClient(std::shared_ptr<Client> client) {
   std::lock_guard<std::mutex> lock(_mutex);
-  auto it = _clients.find(id);
+  auto it = _clients.find(client->GetId());
   if(it!=_clients.end()) {
     _clients.erase(it);
     return true;

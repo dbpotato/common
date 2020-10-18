@@ -31,13 +31,13 @@ class SocketContext;
 class SocketObject : public std::enable_shared_from_this<SocketObject> {
 
 public:
- SocketObject(int raw_handle,
+ SocketObject(int socket_fd,
               bool is_server_socket,
               std::shared_ptr<Connection> connection);
  virtual ~SocketObject();
 
  bool IsServerSocket();
- int Handle();
+ int SocketFd();
  std::shared_ptr<SocketContext> GetContext();
  std::shared_ptr<Connection> GetConnection();
  void SetContext(std::shared_ptr<SocketContext> context);
@@ -45,7 +45,7 @@ public:
  void SetActive(bool is_active);
  virtual void OnConnectionClosed();
 protected:
- int _raw_handle;
+ int _socket_fd;
  bool _is_server_socket;
  bool _is_active;
  bool _was_handle_closed;

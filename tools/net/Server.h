@@ -42,6 +42,7 @@ friend  std::shared_ptr<Server> Connection::CreateServer(int,std::vector<std::we
 public:
   std::shared_ptr<Client> GetClient(uint32_t id);
   void GetClients(std::vector<std::shared_ptr<Client> >& vec);
+  bool RemoveClient(std::shared_ptr<Client> client);
 
   //ClientManager interface implementations
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
@@ -52,7 +53,6 @@ public:
 
 protected:
   void AddClient(std::shared_ptr<Client> client);
-  bool RemoveClient(uint32_t id);
   void Clear();
 
   std::shared_ptr<Server> _server;
