@@ -21,28 +21,36 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#pragma once
+#include "ThreadLoop.h"
 
-#include "Utils.h"
-#include "Collector.h"
+void ThreadLoop::Init() {
+  _run_thread.Run(shared_from_this(), 0);
+}
 
-#include <memory>
+void ThreadLoop::Post(std::function<void()> request) {
+  std::unique_lock<std::mutex> lock(_condition_mutex);
+  _msgs.push(request);
+  _condition.notify_one();
+}
 
-class Client;
-class ThreadLoop;
+bool ThreadLoop::OnDifferentThread() {
+  return !_run_thread.OnSameThread();
+}
 
-class ConnectThread : public std::enable_shared_from_this<ConnectThread> {
+void ThreadLoop::OnThreadStarted(int thread_id) {
+  while(_run_thread.ShouldRun()) {
 
-public:
-  static std::shared_ptr<ConnectThread> GetInstance();
-  void AddClient(std::shared_ptr<Client> client);
+    std::function<void()> msg;
+    {
+      std::unique_lock<std::mutex> lock(_condition_mutex);
+      _condition.wait(lock, [this]{return !_msgs.empty() || !_run_thread.ShouldRun();});
+      msg = _msgs.front();
+      _msgs.pop();
+    }
 
-private:
-  ConnectThread();
-  void ConnectClients();
-  void OnConnectComplete(std::shared_ptr<Client>, NetError err);
-
-  static std::weak_ptr<ConnectThread> _instance;
-  Collector<std::shared_ptr<Client>> _clients;
-  std::shared_ptr<ThreadLoop> _thread_loop;
-};
+    if(msg)
+      msg();
+    else
+      return;
+  }
+}

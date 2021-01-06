@@ -55,7 +55,7 @@ public:
   void OnThreadStarted(int thread_id) override;
 
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
-  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
+  virtual bool OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
   virtual void OnClientClosed(std::shared_ptr<Client> client) override;
   bool IsRaw() override;
 

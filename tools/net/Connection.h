@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -75,7 +75,6 @@ protected: //TODO
   virtual std::shared_ptr<SocketContext> CreateSocketContext(bool from_accept);
   virtual bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size);
   virtual bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size);
-  virtual void Close(SocketObject* obj);
 
   int CreateServerSocket(int port);
 
@@ -84,6 +83,7 @@ protected: //TODO
 
   void Read(std::shared_ptr<Client> obj);
   bool Write(std::shared_ptr<Client> obj, std::shared_ptr<Message>);
+  void Close(int socket_fd);
 
 private: //TODO
   std::shared_ptr<Transporter> _transporter;

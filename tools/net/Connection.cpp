@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -171,7 +171,7 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
 
   int socket = accept(server->SocketFd(), &client_addr, &client_addr_len);
   if(socket < 0) {
-    DLOG(warn, "Connection::Accept fail");
+    DLOG(warn, "Connection::Accept fail on socket : {}", server->SocketFd());
     return;
   }
 
@@ -210,10 +210,6 @@ void Connection::NotifySocketActiveChanged(std::shared_ptr<SocketObject> obj) {
     _transporter->DisableSocket(obj);
 }
 
-void Connection::Close(SocketObject* obj) {
-  close(obj->SocketFd());
-}
-
 void Connection::ProcessSocket(std::shared_ptr<SocketObject> obj) {
   if(obj->IsServerSocket())
     Accept(obj);
@@ -230,9 +226,8 @@ void Connection::Read(std::shared_ptr<Client> obj) {
     bool res = SocketRead(obj, buff, SOC_READ_BUFF_SIZE, read_len);
 
     if (!res) {
-      _transporter->RemoveSocket(obj);
       obj->OnConnectionClosed();
-      Close(obj.get());
+      Close(obj->SocketFd());
       return;
     }
 
@@ -306,6 +301,11 @@ bool Connection::Write(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg
 
 
   return completed;
+}
+
+void Connection::Close(int socket_fd) {
+  _transporter->RemoveSocket(socket_fd);
+  close(socket_fd);
 }
 
 void Connection::Init() {

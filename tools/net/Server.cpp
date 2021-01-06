@@ -59,14 +59,22 @@ void Server::OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> 
        listener->OnMsgSent(client, msg, success);
 }
 
-void Server::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+bool Server::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
   if(err == NetError::OK) {
-    AddClient(client);
-  }
+    bool accepted = true;
 
-  for(auto listener_wp : _listeners)
-    if(auto listener = listener_wp.lock())
-      listener->OnClientConnected(client, err);
+    for(auto listener_wp : _listeners) {
+      if(auto listener = listener_wp.lock()) {
+        accepted = accepted && listener->OnClientConnected(client, err);
+      }
+    }
+
+    if(accepted)
+      AddClient(client);
+
+    return accepted;
+  }
+  return false;
 }
 
 bool Server::IsRaw() {

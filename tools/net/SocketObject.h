@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -42,13 +42,14 @@ public:
  std::shared_ptr<Connection> GetConnection();
  void SetContext(std::shared_ptr<SocketContext> context);
  bool IsActive();
+ bool IsValid();
  void SetActive(bool is_active);
  virtual void OnConnectionClosed();
 protected:
  int _socket_fd;
  bool _is_server_socket;
  bool _is_active;
- bool _was_handle_closed;
+ bool _was_fd_closed;
  std::shared_ptr<SocketContext> _context;
  std::shared_ptr<Connection> _connection;
 };

@@ -49,7 +49,9 @@ bool SocketEventListener::Event::Closed() {
 }
 
 
-Epool::Epool() : _epool_fd(-1) {
+Epool::Epool()
+    : _epool_fd(-1)
+    , _events_handed(true) {
 }
 
 bool Epool::Init(std::weak_ptr<SocketEventListener> listener) {
@@ -64,8 +66,10 @@ bool Epool::Init(std::weak_ptr<SocketEventListener> listener) {
   return false;
 }
 
-bool Epool::SameThread() {
-  return _run_thread.OnSameThread();
+void Epool::NotifyEventsHandled() {
+  std::unique_lock<std::mutex> lock(_condition_mutex);
+  _events_handed = true;
+  _condition.notify_one();
 }
 
 bool Epool::AddSocket(int socket_fd) {
@@ -102,6 +106,15 @@ void Epool::SetFlags(int socket_fd, bool can_read, bool can_write) {
 
 void Epool::OnThreadStarted(int thread_id) {
   while(_run_thread.ShouldRun()) {
+    {
+      std::unique_lock<std::mutex> lock(_condition_mutex);
+      _condition.wait(lock, [this]{return _events_handed || !_run_thread.ShouldRun();});
+      _events_handed = false;
+    }
+
+    if( !_run_thread.ShouldRun())
+      return;
+
     std::array<struct epoll_event, EPOOL_MAX_EVENTS> events;
     int epool_size = epoll_wait(_epool_fd, events.data(), EPOOL_MAX_EVENTS, -1);
     if(auto listener = _listener.lock()) {

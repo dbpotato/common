@@ -97,13 +97,17 @@ void ConnectionChecker::OnThreadStarted(int id){
 void ConnectionChecker::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
   SetState(ConnectionState::CONNECTED);
 }
-void ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+
+bool ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
   DLOG(info, "ConnectionChecker::OnClientConnected() : {}", (err == NetError::OK));
   if(err == NetError::OK) {
     _current_client = client;
     SetState(ConnectionState::CONNECTED);
+    return true;
   }
+  return false;
 }
+
 void ConnectionChecker::OnClientClosed(std::shared_ptr<Client> client) {
   _current_client.reset();
   SetState(ConnectionState::NOT_CONNECTED);

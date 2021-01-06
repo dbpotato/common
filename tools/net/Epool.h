@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <memory>
 #include <vector>
-
+#include <condition_variable>
 
 class SocketObject;
 
@@ -57,12 +57,14 @@ public:
   bool AddSocket(int socket_fd);
   void RemoveSocket(int socket_fd);
   void SetFlags(int socket_fd, bool can_read, bool can_write);
-  bool SameThread();
+  //bool SameThread();
+  void NotifyEventsHandled();
 
 private:
-  void WaitForEvents();
-  void Notify();
   int _epool_fd;
+  bool _events_handed;
   PosixThread _run_thread;
+  std::condition_variable _condition;
+  std::mutex _condition_mutex;
   std::weak_ptr<SocketEventListener> _listener;
 };

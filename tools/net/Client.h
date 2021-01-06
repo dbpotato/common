@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -39,7 +39,7 @@ class ClientManager {
 public:
   virtual void OnServerCreated(std::weak_ptr<Server> server);
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
-  virtual void OnClientConnected(std::shared_ptr<Client> client, NetError err);
+  virtual bool OnClientConnected(std::shared_ptr<Client> client, NetError err);
   virtual void OnClientClosed(std::shared_ptr<Client> client);
   virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success);
   virtual bool IsRaw() = 0;
@@ -56,7 +56,7 @@ public:
   void OnMsgWrite(std::shared_ptr<Message> msg, bool status);
   void OnDataRead(Data& data);
   void OnConnectionClosed() override;
-  void OnConnected(NetError err);
+  bool OnConnected(NetError err);
 
   uint32_t GetId();
   const std::string& GetUrl();

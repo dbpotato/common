@@ -23,26 +23,23 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Utils.h"
-#include "Collector.h"
-
+#include <functional>
 #include <memory>
+#include <condition_variable>
+#include <queue>
 
-class Client;
-class ThreadLoop;
+#include "PosixThread.h"
 
-class ConnectThread : public std::enable_shared_from_this<ConnectThread> {
-
-public:
-  static std::shared_ptr<ConnectThread> GetInstance();
-  void AddClient(std::shared_ptr<Client> client);
-
+class ThreadLoop : public std::enable_shared_from_this<ThreadLoop>
+                 , public ThreadObject {
+public :
+  void Init();
+  void OnThreadStarted(int thread_id) override;
+  void Post(std::function<void()> request);
+  bool OnDifferentThread();
 private:
-  ConnectThread();
-  void ConnectClients();
-  void OnConnectComplete(std::shared_ptr<Client>, NetError err);
-
-  static std::weak_ptr<ConnectThread> _instance;
-  Collector<std::shared_ptr<Client>> _clients;
-  std::shared_ptr<ThreadLoop> _thread_loop;
+  PosixThread _run_thread;
+  std::condition_variable _condition;
+  std::mutex _condition_mutex;
+  std::queue<std::function<void()>> _msgs;
 };

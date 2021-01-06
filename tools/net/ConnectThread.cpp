@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 Adam Kaniewski
+Copyright (c) 2020 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Transporter.h"
 #include "Client.h"
 #include "SocketContext.h"
+#include "ThreadLoop.h"
 
 #include <vector>
 
@@ -34,53 +35,19 @@ std::shared_ptr<ConnectThread> ConnectThread::GetInstance() {
   std::shared_ptr<ConnectThread> instance;
   if(!(instance =_instance.lock())) {
     instance.reset(new ConnectThread());
-    instance->Init();
     _instance = instance;
   }
   return instance;
 }
 
-ConnectThread::ConnectThread() : _is_ready(false) {
-}
-
-ConnectThread::~ConnectThread() {
-  _run_thread.Stop();
-  _run_thread.Join();
-}
-
-void ConnectThread::Init() {
-  _run_thread.Run(shared_from_this(), 0);
-}
-
-void ConnectThread::WaitOnCondition() {
-  std::unique_lock<std::mutex> lock(_condition_mutex);
-  _condition.wait(lock, [this]{return _is_ready;});
-  _is_ready = false;
-  lock.unlock();
-}
-
-void ConnectThread::Notify() {
-  {
-    std::lock_guard<std::mutex> lock(_condition_mutex);
-    _is_ready = true;
-  }
-  _condition.notify_one();
-}
-
-void ConnectThread::OnThreadStarted(int thread_id) {
-  while(_run_thread.ShouldRun()) {
-    WaitOnCondition();
-    std::vector<std::shared_ptr<Client>> clients;
-
-    if(!_run_thread.ShouldRun())
-      return;
-    ConnectClients();
-  }
+ConnectThread::ConnectThread() {
+  _thread_loop = std::make_shared<ThreadLoop>();
+  _thread_loop->Init();
 }
 
 void ConnectThread::AddClient(std::shared_ptr<Client> client) {
   _clients.Add(client);
-  Notify();
+  _thread_loop->Post(std::bind(&ConnectThread::ConnectClients, shared_from_this()));
 }
 
 void ConnectThread::ConnectClients() {
@@ -108,11 +75,14 @@ void ConnectThread::ConnectClients() {
 
 void ConnectThread::OnConnectComplete(std::shared_ptr<Client> client, NetError err) {
   auto transporter = Transporter::GetInstance();
-  if(err == NetError::OK) {
+
+  if(client->IsValid()) {
     transporter->AddSocket(client);
   }
-  client->OnConnected(err);
-  if(client->IsActive() && (err == NetError::OK)) {
+
+  if( (client->OnConnected(err)) &&
+      (err == NetError::OK) &&
+      (client->IsActive()) ) {
     transporter->EnableSocket(client);
   }
 }

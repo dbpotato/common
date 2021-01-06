@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -38,8 +38,9 @@ void ClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr
   DLOG(warn, "ClientManager::OnClientRead : not implemented");
 }
 
-void ClientManager::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+bool ClientManager::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
   DLOG(warn, "ClientManager::OnClientConnected : not implemented");
+  return true;
 }
 
 void ClientManager::OnClientClosed(std::shared_ptr<Client> client) {
@@ -108,10 +109,11 @@ std::shared_ptr<Client> Client::SharedPtr() {
   return std::static_pointer_cast<Client>(shared_from_this());
 }
 
-void Client::OnConnected(NetError err) {
+bool Client::OnConnected(NetError err) {
   if(auto manager = _manager.lock()) {
-    manager->OnClientConnected(SharedPtr(), err);
+    return manager->OnClientConnected(SharedPtr(), err);
   }
+  return false;
 }
 
 void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {

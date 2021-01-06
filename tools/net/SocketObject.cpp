@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,7 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "SocketObject.h"
 #include "Connection.h"
-
+#include "Utils.h"
 
 SocketObject::SocketObject(int socket_fd,
                            bool is_server_socket,
@@ -31,13 +31,14 @@ SocketObject::SocketObject(int socket_fd,
     : _socket_fd(socket_fd)
     , _is_server_socket(is_server_socket)
     , _is_active(true)
-    , _was_handle_closed(false)
+    , _was_fd_closed(false)
     , _connection(connection) {
 }
 
 SocketObject::~SocketObject() {
-  if(!_was_handle_closed)
-    _connection->Close(this);
+  if(!_was_fd_closed && IsValid()) {
+    _connection->Close(_socket_fd);
+  }
 }
 
 bool SocketObject::IsServerSocket() {
@@ -64,13 +65,17 @@ bool SocketObject::IsActive() {
   return _is_active;
 }
 
+bool SocketObject::IsValid() {
+  return _socket_fd != DEFAULT_SOCKET;
+}
+
 void SocketObject::SetActive(bool is_active) {
-  if(_is_active != is_active) {
+  if((_is_active != is_active) && IsValid()) {
     _is_active = is_active;
     _connection->NotifySocketActiveChanged(shared_from_this());
   }
 }
 
 void SocketObject::OnConnectionClosed() {
-  _was_handle_closed = true;
+  _was_fd_closed = true;
 }
