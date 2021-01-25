@@ -52,8 +52,8 @@ public:
 protected:
   ConnectionSSL(SSL_CTX* ctx);
   std::shared_ptr<SocketContext> CreateSocketContext(bool from_accept) override;
-  bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size);
-  bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size);
+  bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size) override;
+  bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size) override;
 private:
   SSL_CTX* _ctx;
 };

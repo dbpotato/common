@@ -231,7 +231,7 @@ void Connection::Read(std::shared_ptr<Client> obj) {
       return;
     }
 
-    if(read_len) {
+    if(read_len > 0) {
       std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len],
                                                std::default_delete<unsigned char[]>());
       std::memcpy(data_sptr.get(), (void*)(buff), read_len);
