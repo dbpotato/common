@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -27,9 +27,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <atomic>
 #include <memory>
 
+class PosixThread;
 
 class ThreadObject {
- public :
+public:
   virtual void OnThreadStarted(int thread_id) = 0;
 };
 
@@ -37,19 +38,20 @@ class ThreadObject {
 class PosixThread {
 protected:
   std::weak_ptr<ThreadObject> _thread_obj;
+  std::shared_ptr<ThreadObject> _thread_obj_lock;
   pthread_t _thread;
   int _id;
   std::atomic_bool _is_running;
   std::atomic_bool _should_run;
   static void* StartThread(void* obj);
+  void InternalStartThread();
 
 public:
   PosixThread();
   bool Run(std::weak_ptr<ThreadObject> obj, int id = 0);
   bool OnSameThread();
-  std::weak_ptr<ThreadObject> GetObj();
   void Stop();
-  std::atomic_bool& IsRunning();
-  std::atomic_bool& ShouldRun();
+  bool IsRunning();
+  bool ShouldRun();
   void Join();
 };

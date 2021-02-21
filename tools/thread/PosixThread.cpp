@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -34,12 +34,17 @@ PosixThread::PosixThread()
 
 void* PosixThread::StartThread(void *obj) {
   PosixThread* thread = (PosixThread*) obj;
-  if(auto obj = thread->GetObj().lock()) {
-    obj->OnThreadStarted(thread->_id);
-  }
-  thread->_is_running = false;
-  thread->_should_run = false;
+  thread->InternalStartThread();
   return nullptr;
+}
+
+void PosixThread::InternalStartThread() {
+  if(_thread_obj_lock = _thread_obj.lock()) {
+    _thread_obj_lock->OnThreadStarted(_id);
+  }
+  _thread_obj_lock = nullptr;
+  _is_running = false;
+  _should_run = false;
 }
 
 bool PosixThread::Run(std::weak_ptr<ThreadObject> obj, int id) {
@@ -67,20 +72,16 @@ bool PosixThread::OnSameThread() {
   return false;
 }
 
-std::weak_ptr<ThreadObject> PosixThread::GetObj() {
-  return _thread_obj;
-}
-
 void PosixThread::Stop() {
   _should_run = false;
 }
 
-std::atomic_bool& PosixThread::IsRunning() {
-  return _is_running;
+bool PosixThread::IsRunning() {
+  return _is_running.load();
 }
 
-std::atomic_bool& PosixThread::ShouldRun() {
-  return _should_run;
+bool PosixThread::ShouldRun() {
+  return _should_run.load() && (_thread_obj_lock.use_count() > 1);
 }
 
 void PosixThread::Join() {
