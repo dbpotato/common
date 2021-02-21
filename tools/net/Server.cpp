@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -94,6 +94,11 @@ bool Server::RemoveClient(std::shared_ptr<Client> client) {
     return true;
   }
   return false;
+}
+
+bool Server::RemoveClient(uint32_t id) {
+  std::lock_guard<std::mutex> lock(_mutex);
+  return _clients.erase(id);
 }
 
 std::shared_ptr<Client> Server::GetClient(uint32_t id) {

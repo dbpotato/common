@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2020 Adam Kaniewski
+Copyright (c) 2018 - 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -43,6 +43,7 @@ public:
   std::shared_ptr<Client> GetClient(uint32_t id);
   void GetClients(std::vector<std::shared_ptr<Client> >& vec);
   bool RemoveClient(std::shared_ptr<Client> client);
+  bool RemoveClient(uint32_t id);
 
   //ClientManager interface implementations
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
