@@ -39,7 +39,7 @@ void* PosixThread::StartThread(void *obj) {
 }
 
 void PosixThread::InternalStartThread() {
-  if(_thread_obj_lock = _thread_obj.lock()) {
+  if((_thread_obj_lock = _thread_obj.lock())) {
     _thread_obj_lock->OnThreadStarted(_id);
   }
   _thread_obj_lock = nullptr;
