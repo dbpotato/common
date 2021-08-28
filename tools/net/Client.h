@@ -65,6 +65,7 @@ public:
   std::shared_ptr<Client> SharedPtr();
   void Update(int socket, const std::string& ip);
   void SetManager(std::weak_ptr<ClientManager> manager);
+  void SetMsgBuilder(std::unique_ptr<MessageBuilder> msg_builder);
 
 protected:
   static uint32_t NextId();
@@ -82,6 +83,5 @@ private:
   std::string _url;
   std::weak_ptr<ClientManager> _manager;
   int _id;
-  bool _is_raw;
-  MessageBuilder _msg_builder;
+  std::unique_ptr<MessageBuilder> _msg_builder;
 };

@@ -68,8 +68,11 @@ Client::Client(int socket_fd,
     , _url(url)
     , _manager(manager)
     , _id(NextId()) {
-  if(auto mgr = _manager.lock())
-    _is_raw = mgr->IsRaw();
+  if(auto mgr = _manager.lock()) {
+    if(!mgr->IsRaw()) {
+      _msg_builder.reset(new MessageBuilder());
+    }
+  }
 }
 
 void Client::Update(int socket, const std::string& ip) {
@@ -80,6 +83,11 @@ void Client::Update(int socket, const std::string& ip) {
 void Client::SetManager(std::weak_ptr<ClientManager> manager) {
   _manager = manager;
 }
+
+void Client::SetMsgBuilder(std::unique_ptr<MessageBuilder> msg_builder) {
+  _msg_builder = std::move(msg_builder);
+}
+
 
 uint32_t Client::GetId() {
   return _id;
@@ -122,19 +130,21 @@ void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
 }
 
 void Client::OnDataRead(Data& data) {
-  if(!_is_raw) {
+  if(_msg_builder) {
     std::vector<std::shared_ptr<Message> > msgs;
-    _msg_builder.AddData(data, msgs);
-    if(msgs.size())
-      if(auto manager = _manager.lock())
-        for(auto msg : msgs)
+    _msg_builder->AddData(data, msgs);
+    if(msgs.size()) {
+      if(auto manager = _manager.lock()) {
+        for(auto msg : msgs) {
           manager->OnClientRead(SharedPtr(), msg);
-  }
-  else {
-    auto msg = std::make_shared<Message>(0, data._size, data._data);
-    msg->_is_raw = true;
-    if(auto manager = _manager.lock())
+        }
+      }
+    }
+  } else {
+    auto msg = std::make_shared<Message>(data._size, data._data);
+    if(auto manager = _manager.lock()) {
       manager->OnClientRead(SharedPtr(), msg);
+    }
   }
 }
 

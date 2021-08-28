@@ -1,5 +1,5 @@
-/*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+ /*
+Copyright (c) 2021 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,25 +23,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Connection.h"
+#include <string>
 
-#include <memory>
-#include <vector>
 
-class Message;
-
-class MessageBuilder {
+class MimeTypeFinder {
 public:
-  MessageBuilder();
-  void AddData(Data data, std::vector<std::shared_ptr<Message> >& out_msgs);
-protected:
-  uint32_t _expected_data_size;
-  uint32_t _data_size;
-  uint32_t _data_size_cap;
-  uint8_t _type;
-  std::shared_ptr<unsigned char> _data;
-  void MaybeResize(size_t add_size);
-  virtual void Check(std::vector<std::shared_ptr<Message> >& out_msgs);
-  virtual void MaybeGetHeaderData();
-  virtual std::shared_ptr<Message> CreateMessage();
+  static const std::string& Find(const std::string& resource);
 };
