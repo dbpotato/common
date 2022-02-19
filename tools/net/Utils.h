@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2020 Adam Kaniewski
+Copyright (c) 2019 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -40,6 +40,10 @@ public:
   uint32_t _size;
   std::shared_ptr<unsigned char> _data;
   Data() : _size(0) {}
+  Data(uint32_t size, std::shared_ptr<unsigned char> data)
+      : _size(size)
+      , _data(data) {
+  }
 };
 
 template<class T>

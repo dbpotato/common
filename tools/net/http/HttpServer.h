@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 Adam Kaniewski
+Copyright (c) 2021 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,40 +25,31 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Client.h"
 
-#include <memory>
 #include <map>
+#include <memory>
 #include <vector>
 
-class ModuleManager;
-class Server;
-class Message;
+
 class Connection;
-
+class Message;
+class ModuleManager;
+class HttpHeader;
+class HttpMessage;
 class HttpServer;
-
+class Server;
 
 class HttpRequest {
 public:
   HttpRequest();
-  void Reject();
-  void SetResponse(const std::string& response);
-  enum Type {UNKNOWN, GET, POST};
-  Type _type;
-  std::string _resource_name;
-  std::string _post_msg;
-
-  std::string _response_mime_type;
-  std::shared_ptr<unsigned char> _response_data;
-  size_t _response_data_size;
+  std::shared_ptr<HttpMessage> _request_msg;
+  std::shared_ptr<HttpMessage> _response_msg;
   std::weak_ptr<Client> _client;
   bool _handled;
-  bool _valid;
 };
-
 
 class HttpRequestHandler {
 public:
-  virtual void GetResource(HttpRequest& request) = 0;
+  virtual void Handle(HttpRequest& request) = 0;
 };
 
 class HttpServer : public ClientManager
@@ -71,12 +62,11 @@ public:
             int port);
 
   bool OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
-  void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
+  virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
   bool IsRaw() override;
 
-private:
-  void ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
-  void ParseRequest(HttpRequest& req, const std::string& str);
+protected:
+  virtual void ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg);
   void SendResponse(HttpRequest& req);
 
   std::shared_ptr<Server> _server;

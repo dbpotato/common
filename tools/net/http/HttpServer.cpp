@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 Adam Kaniewski
+Copyright (c) 2020 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -21,46 +21,17 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-
-#include "HttpServer.h"
-#include "Logger.h"
-#include "Server.h"
 #include "Connection.h"
+#include "HttpHeader.h"
+#include "HttpMessage.h"
+#include "HttpServer.h"
 #include "Message.h"
 #include "MessageBuilderHttp.h"
-#include "MimeTypeFinder.h"
-
-#include <sstream>
-#include <vector>
-
-std::vector<std::string> split(const std::string &s, char delim) {
-  std::stringstream ss(s);
-  std::string item;
-  std::vector<std::string> elems;
-  while (std::getline(ss, item, delim)) {
-    if(item.length())
-      elems.push_back(std::move(item));
-  }
-  return elems;
-}
-
+#include "Logger.h"
+#include "Server.h"
 
 HttpRequest::HttpRequest()
-  : _type(Type::UNKNOWN)
-  , _response_data_size(0)
-  , _handled(false)
-  , _valid(true) {
-}
-
-void HttpRequest::Reject() {
-  _handled = false;
-  _valid = false;
-}
-
-void HttpRequest::SetResponse(const std::string& response) {
-  _response_data_size = response.length();
-  _response_data = std::shared_ptr<unsigned char>(new unsigned char[_response_data_size], std::default_delete<unsigned char[]>());
-  std::memcpy(_response_data.get(), response.c_str(), _response_data_size);
+  : _handled(false) {
 }
 
 HttpServer::HttpServer() {
@@ -81,77 +52,42 @@ bool HttpServer::OnClientConnected(std::shared_ptr<Client> client, NetError err)
 }
 
 void HttpServer::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
-  ProcessRequest(client, msg);
+  std::shared_ptr<HttpMessage> http_msg = std::static_pointer_cast<HttpMessage>(msg);
+  ProcessRequest(client, http_msg);
 }
 
 bool HttpServer::IsRaw() {
   return true;
 }
 
-void HttpServer::ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
-  HttpRequest req;
-  req._client = client;
-  ParseRequest(req, msg->ToString());
-  if(req._type == HttpRequest::Type::UNKNOWN) {
-    req._valid = false;
-  } else {
-    _request_handler->GetResource(req);
+void HttpServer::ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg) {
+  HttpRequest request;
+  request._request_msg = msg;
+  request._client = client;
+
+  if(msg->GetHeader()->GetMethod() != HttpHeaderMethod::UNKNOWN_TYPE) {
+    _request_handler->Handle(request);
   }
-  if(!req._handled) {
-    SendResponse(req);
-    client->Send(std::make_shared<Message>(req._response_data_size, req._response_data));
+
+  if(!request._handled) {
+    SendResponse(request);
   }
 }
 
-void HttpServer::ParseRequest(HttpRequest& req, const std::string& str) {
-  std::vector<std::string> header = split(str, ' ');
-  if(header.size() < 2)
-    return;
-
-  req._resource_name = header.at(1);
-  if(!req._resource_name.compare("/")) {
-    req._resource_name = "/index.html";
-  }
-
-  if(!header.at(0).compare("GET")) {
-    req._type = HttpRequest::Type::GET;
-  }
-  else if(!header.at(0).compare("POST")) {
-    req._type = HttpRequest::Type::POST;
-    std::size_t found = str.find("\r\n\r\n");
-    if(found!=std::string::npos && found + 4 < str.length()) {
-      req._post_msg = std::string(str.c_str() + found + 4);
-    }
-  }
-}
-
-void HttpServer::SendResponse(HttpRequest& req) {
-  auto client = req._client.lock();
+void HttpServer::SendResponse(HttpRequest& request) {
+  auto client = request._client.lock();
   if(!client)
     return;
 
-  if(req._response_mime_type.empty()) {
-    req._response_mime_type = MimeTypeFinder::Find(req._resource_name);
+  std::shared_ptr<Message> response;
+  if(request._response_msg ) {
+    response = request._response_msg->ConvertToBaseMessage();
   }
 
-  std::stringstream str_stream;
-  if(!req._valid) {
-    str_stream << "HTTP/1.1 404 Not Found\r\n"\
-                  "Content-Length: 0\r\n\r\n";
-  } else {  
-    str_stream << "HTTP/1.1 200 OK\r\n"\
-                  "Cache-Control: no-cache\r\n"\
-                  "Content-Type: " << req._response_mime_type << "\r\n"\
-                  "Content-Length: " << req._response_data_size << "\r\n\r\n";
+  if(!response) {
+    auto error_msg = std::make_shared<HttpMessage>(500);
+    response = error_msg->ConvertToBaseMessage();
   }
 
-  std::string header = str_stream.str();
-  size_t msg_size = header.length() + req._response_data_size;
-
-  auto data = std::shared_ptr<unsigned char>(new unsigned char[msg_size], std::default_delete<unsigned char[]>());
-  std::memcpy(data.get(), header.c_str(), header.length());
-  if(req._response_data_size) {
-    std::memcpy(data.get() + header.length(), req._response_data.get(), req._response_data_size);
-  }
-  client->Send(std::make_shared<Message>(msg_size, data));
+  client->Send(request._response_msg->ConvertToBaseMessage());
 }

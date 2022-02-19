@@ -22,11 +22,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "MimeTypeFinder.h"
+#include "StringUtils.h"
 
 #include <map>
 #include <vector>
-#include <sstream>
-#include <algorithm>
+
 
 const std::string DEFUALT_MIME_TYPE = "application/octet-stream";
 const std::map<const std::string, const std::string> MIME_TYPE_MAP = {
@@ -109,22 +109,13 @@ const std::map<const std::string, const std::string> MIME_TYPE_MAP = {
 };
 
 const std::string& MimeTypeFinder::Find(const std::string& resource) {
-  std::vector<std::string> split;
-  std::stringstream rest_stream(resource);
-  std::string element;
-      
-  while(getline(rest_stream, element, '.')) {
-    split.push_back(element);
-  }
+  std::vector<std::string> split = StringUtils::Split(resource, ".");
+
   if(!split.size()) {
     return DEFUALT_MIME_TYPE;
   }
 
-  std::string ext = split.back();
-  std::transform(ext.begin(), ext.end(), ext.begin(),
-    [](unsigned char c){ return std::tolower(c); }
-  );
-
+  std::string ext = StringUtils::Lowercase(split.back());
   auto it = MIME_TYPE_MAP.find(ext);
   if(it != MIME_TYPE_MAP.end()) {
     return it->second;

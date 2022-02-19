@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 Adam Kaniewski
+Copyright (c) 2021 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,11 +23,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #include "MessageBuilderHttp.h"
-#include "Message.h"
+#include "HttpMessage.h"
 #include "Logger.h"
 
-#include <cstring>
 #include <algorithm>
+#include <cstring>
 #include <sstream>
 #include <string>
 
@@ -59,27 +59,27 @@ void MessageBuilderHttp::MaybeGetHeaderData() {
     }
 
     _content_pos = (int)header_end + 4;
-    auto header = std::string((const char*)_data.get(), header_end);
-
-    std::transform(header.begin(), header.end(), header.begin(), [](unsigned char c){
-      return std::tolower(c);
-    });
-
-    auto content_str_pos = header.find("content-length:");
-    if(content_str_pos == std::string::npos) {
-      _content_lenght = 0;
-      _expected_data_size = _content_pos;
-    } else {
-      auto content_str_pos_end = header.find("\r\n", content_str_pos);
-      auto content_len_val_str =  std::string((const char*)_data.get() + content_str_pos + 15, header_end - content_str_pos_end);
-      _content_lenght =  std::stoi(content_len_val_str);
-      _expected_data_size = _content_pos + _content_lenght;
+    _content_lenght = 0;
+    std::string header_str = std::string((const char*)_data.get(), header_end);
+    _header = HttpHeader::Parse(header_str);
+    if(_header) {
+      std::string content_len_val_str;
+      if(_header->GetFieldValue(HttpHeaderField::CONTENT_LENGTH, content_len_val_str)) {
+        _content_lenght = std::atoi(content_len_val_str.c_str());
+        _expected_data_size = _content_pos + _content_lenght;
+      }
     }
+    _expected_data_size = _content_pos + _content_lenght;
   }
 }
 
 std::shared_ptr<Message> MessageBuilderHttp::CreateMessage() {
-  std::shared_ptr<Message> msg = std::make_shared<Message>(_expected_data_size, _data, 0, true);
+  std::shared_ptr<HttpMessage> msg = std::make_shared<HttpMessage>(_expected_data_size - _content_pos,
+                                                                   _data,
+                                                                   _content_pos,
+                                                                   true,
+                                                                   _header);
+
   if(_data_size > _expected_data_size) {
     _data_size_cap = (_data_size - _expected_data_size)*2;
     std::shared_ptr<unsigned char> new_data(new unsigned char[_data_size_cap],

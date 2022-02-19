@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 - 2022 Adam Kaniewski
+Copyright (c) 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,19 +24,38 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "HttpHeader.h"
-#include "MessageBuilder.h"
+#include "Message.h"
 
 
-class Message;
+class HttpMessage : public Message {
+public :
+  HttpMessage(int status_code,
+              const std::string& body_text = {});
 
-class MessageBuilderHttp : public MessageBuilder{
-public:
-  MessageBuilderHttp();
-private:
-  void Check(std::vector<std::shared_ptr<Message> >& out_msgs) override;
-  void MaybeGetHeaderData() override;
-  std::shared_ptr<Message> CreateMessage() override;
-  int _content_lenght;
-  int _content_pos;
+  HttpMessage(int status_code,
+              uint32_t body_size,
+              const void* body_data);
+
+  HttpMessage(HttpHeaderMethod::Type method,
+              const std::string& request,
+              const std::string& body_text = {});
+
+  HttpMessage(HttpHeaderMethod::Type method,
+              const std::string& request,
+              uint32_t body_size,
+              const void* body_data);
+
+  HttpMessage(uint32_t body_size,
+              std::shared_ptr<unsigned char> body_data,
+              uint32_t data_offset,
+              bool copy_data,
+              std::shared_ptr<HttpHeader> header);
+
+  std::shared_ptr<Message> ConvertToBaseMessage();
+  std::shared_ptr<HttpHeader> GetHeader();
+
+private :
+  void CreateHeader(int status_code, uint32_t body_size);
+  void CreateHeader(HttpHeaderMethod::Type method, const std::string& request, uint32_t body_size);
   std::shared_ptr<HttpHeader> _header;
 };
