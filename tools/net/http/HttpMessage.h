@@ -51,7 +51,7 @@ public :
               bool copy_data,
               std::shared_ptr<HttpHeader> header);
 
-  std::shared_ptr<Message> ConvertToBaseMessage();
+  std::shared_ptr<Message> ConvertToBaseMessage() override;
   std::shared_ptr<HttpHeader> GetHeader();
 
 private :

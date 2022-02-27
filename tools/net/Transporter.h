@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2021 Adam Kaniewski
+Copyright (c) 2019 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Utils.h"
 #include "Epool.h"
+#include "Message.h"
 
 #include <memory>
 #include <vector>
@@ -34,6 +35,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 class Connection;
 class Client;
 class Message;
+class MessageWriteRequest;
 class SocketObject;
 class ThreadLoop;
 class Epool;
@@ -55,7 +57,7 @@ class Transporter : public std::enable_shared_from_this<Transporter>
                   , public SocketEventListener {
 public:
   static std::shared_ptr<Transporter> GetInstance();
-  void AddSendRequest(int socket_fd, std::shared_ptr<Message> msg);
+  void AddSendRequest(int socket_fd, MessageWriteRequest req);
   void AddSocket(std::shared_ptr<SocketObject> socket_obj);
   void RemoveSocket(int socket_fd);
   void EnableSocket(std::shared_ptr<SocketObject> socket_obj);
@@ -66,7 +68,7 @@ private:
   void Init();
   void SendPending(std::shared_ptr<Client> client);
 
-  std::map<int, std::vector<std::shared_ptr<Message>>> _write_reqs;
+  std::map<int, std::vector<MessageWriteRequest>> _write_reqs;
   static std::weak_ptr<Transporter> _instance;
   std::map<int, SocketInfo> _sockets;
   std::shared_ptr<Epool> _epool;

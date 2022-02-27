@@ -114,8 +114,8 @@ bool WebsocketClientListenerImpl::OnWsClientConnected(std::shared_ptr<Client> cl
 void WebsocketClientListenerImpl::OnWsClientMessage(std::shared_ptr<Client> client, std::shared_ptr<WebsocketMessage> message) {
   log()->info("WS Received from client : {} message : {}", client->GetId(), message->ToString());
 
-  WebsocketMessage response("Hello client with id : " + std::to_string(client->GetId()));
-  client->Send(response.ConvertToBaseMessage());
+  auto response = std::make_shared<WebsocketMessage>("Hello client with id : " + std::to_string(client->GetId()));
+  client->Send(response);
 }
 
 void WebsocketClientListenerImpl::OnWsClientClosed(std::shared_ptr<Client> client) {

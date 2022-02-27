@@ -110,6 +110,7 @@ void Client::Send(std::shared_ptr<Message> msg) {
     DLOG(error, "Client::Send - client is not active");
     return;
   }
+  msg = msg->ConvertToBaseMessage();
   _connection->SendMsg(SharedPtr(), msg);
 }
 

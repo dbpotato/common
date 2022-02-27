@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -252,25 +252,27 @@ bool Connection::SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size
   return out_write_size > 0;
 }
 
-bool Connection::Write(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {
+bool Connection::Write(std::shared_ptr<Client> obj, MessageWriteRequest& req) {
   bool failed = false;
   int write_size = 0;
   bool completed = false;
 
+  std::shared_ptr<Message> msg = req._msg;
+
   uint32_t total_size = msg->_is_raw ? msg-> _size : msg-> _size + MESSAGE_HEADER_LENGTH;
 
   if(!msg->_is_raw) {
-    if(msg->_write_offset < MESSAGE_HEADER_LENGTH) {
+    if(req._write_offset < MESSAGE_HEADER_LENGTH) {
       uint8_t header[MESSAGE_HEADER_LENGTH] = {0};
       std::memcpy(header, &msg->_type, sizeof(msg->_type));
       std::memcpy(header + sizeof(msg->_type), &msg->_size, sizeof(msg->_size));
 
       if(SocketWrite(obj,
-                     header + msg->_write_offset,
-                     MESSAGE_HEADER_LENGTH - msg->_write_offset,
+                     header + req._write_offset,
+                     MESSAGE_HEADER_LENGTH - req._write_offset,
                      write_size)) {
-        msg->_write_offset += write_size;
-        if(msg->_write_offset < MESSAGE_HEADER_LENGTH) {
+        req._write_offset += write_size;
+        if(req._write_offset < MESSAGE_HEADER_LENGTH) {
           return completed;
         }
       }
@@ -281,19 +283,19 @@ bool Connection::Write(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg
   }
 
   if(msg->_size && !failed) {
-    uint32_t offset = msg->_is_raw ? msg-> _write_offset : msg-> _write_offset - MESSAGE_HEADER_LENGTH;
+    uint32_t offset = msg->_is_raw ? req._write_offset : req._write_offset - MESSAGE_HEADER_LENGTH;
     if(SocketWrite(obj,
                    msg->_data.get() + offset,
                    msg->_size - offset,
                    write_size)) {
-      msg->_write_offset += write_size;
+      req._write_offset += write_size;
     }
     else {
       failed = true;
     }
   }
 
-  if((msg->_write_offset == total_size) || failed )
+  if((req._write_offset == total_size) || failed )
     completed = true;
 
   if(completed)
@@ -315,7 +317,10 @@ void Connection::Init() {
 
 void Connection::SendMsg(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {
   //TODO is active check
-  if(!Write(obj,msg))
-    _transporter->AddSendRequest(obj->SocketFd(), msg);
+
+  MessageWriteRequest req(msg);
+
+  if(!Write(obj, req))
+    _transporter->AddSendRequest(obj->SocketFd(), req);
 }
 

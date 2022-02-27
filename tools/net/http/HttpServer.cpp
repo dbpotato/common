@@ -79,15 +79,9 @@ void HttpServer::SendResponse(HttpRequest& request) {
   if(!client)
     return;
 
-  std::shared_ptr<Message> response;
-  if(request._response_msg ) {
-    response = request._response_msg->ConvertToBaseMessage();
+  if(!request._response_msg) {
+    request._response_msg = std::make_shared<HttpMessage>(500);
   }
 
-  if(!response) {
-    auto error_msg = std::make_shared<HttpMessage>(500);
-    response = error_msg->ConvertToBaseMessage();
-  }
-
-  client->Send(request._response_msg->ConvertToBaseMessage());
+  client->Send(request._response_msg);
 }

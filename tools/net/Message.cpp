@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2019 Adam Kaniewski
+Copyright (c) 2018 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -28,10 +28,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <unistd.h>
 
 
+MessageWriteRequest::MessageWriteRequest(std::shared_ptr<Message> msg)
+    : _msg(msg)
+    , _write_offset(0) {
+}
+
+
 Message::Message(uint32_t size, const void* data)
   : _type(0)
   , _size(size)
-  , _write_offset(0)
   , _is_raw(true) {
   if(_size) {
     _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
@@ -42,7 +47,6 @@ Message::Message(uint32_t size, const void* data)
 Message::Message(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t offset, bool copy)
   : _type(0)
   , _size(size)
-  , _write_offset(0)
   , _data(data)
   , _is_raw(true) {
   if(copy || offset) {
@@ -54,7 +58,6 @@ Message::Message(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t of
 Message::Message(const std::string& str)
   : _type(0)
   , _size(str.length())
-  , _write_offset(0)
   , _is_raw(true) {
   if(_size) {
     _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
@@ -65,7 +68,6 @@ Message::Message(const std::string& str)
 Message::Message(uint8_t type)
   : _type(type)
   , _size(0)
-  , _write_offset(0)
   , _is_raw(false) {
 }
 
@@ -85,6 +87,10 @@ Message::Message(uint8_t type, const std::string& str)
     : Message(str) {
   _type = type;
   _is_raw = false;
+}
+
+std::shared_ptr<Message> Message::ConvertToBaseMessage() {
+  return shared_from_this();
 }
 
 std::string Message::ToString(uint32_t offset) {

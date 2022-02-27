@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -32,6 +32,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 class Message;
+class MessageWriteRequest;
 class Client;
 class ClientManager;
 class ClientOwner;
@@ -82,7 +83,7 @@ protected: //TODO
   void ProcessUnfinishedSocket(std::shared_ptr<SocketObject> obj);
 
   void Read(std::shared_ptr<Client> obj);
-  bool Write(std::shared_ptr<Client> obj, std::shared_ptr<Message>);
+  bool Write(std::shared_ptr<Client> obj, MessageWriteRequest& req);
   void Close(int socket_fd);
 
 private: //TODO

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2021 Adam Kaniewski
+Copyright (c) 2019 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -211,8 +211,8 @@ void Transporter::SendPending(std::shared_ptr<Client> client) {
   auto& req_vec = it->second;
 
   for(auto vec_it = req_vec.begin(); vec_it != req_vec.end();) {
-    auto& msg = *vec_it;
-    if(!client->GetConnection()->Write(client, msg)) {
+    auto& msg_write_req = *vec_it;
+    if(!client->GetConnection()->Write(client, msg_write_req)) {
       break;
     }
     else {
@@ -236,11 +236,11 @@ std::shared_ptr<Transporter> Transporter::GetInstance() {
   return instance;
 }
 
-void Transporter::AddSendRequest(int socket_fd, std::shared_ptr<Message> msg) {
+void Transporter::AddSendRequest(int socket_fd, MessageWriteRequest req) {
   if(_thread_loop->OnDifferentThread()) {
-    _thread_loop->Post(std::bind(&Transporter::AddSendRequest, shared_from_this(), socket_fd, msg));
+    _thread_loop->Post(std::bind(&Transporter::AddSendRequest, shared_from_this(), socket_fd, req));
     return;
   }
-  _write_reqs[socket_fd].push_back(msg);
+  _write_reqs[socket_fd].push_back(req);
   _epool->SetFlags(socket_fd, true, true);
 }

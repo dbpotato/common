@@ -40,7 +40,7 @@ public :
 
   bool _is_text_message;
   std::shared_ptr<WebsocketHeader> _header;
-  std::shared_ptr<Message> ConvertToBaseMessage();
+  std::shared_ptr<Message> ConvertToBaseMessage() override;
 private :
   static std::shared_ptr<Message> CreateBaseMessage(WebsocketHeader::OpCode op_code, uint32_t data_size, std::shared_ptr<unsigned char> data);
 };
