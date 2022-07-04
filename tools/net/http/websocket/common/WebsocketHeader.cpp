@@ -25,6 +25,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Logger.h"
 
 #include <bitset>
+#include <endian.h>
+
 
 const int START_SIZE = 2;
 const int LONGER_PAYLOAD_SIZE = 2;

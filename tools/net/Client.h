@@ -82,6 +82,6 @@ private:
   int _port;
   std::string _url;
   std::weak_ptr<ClientManager> _manager;
-  int _id;
+  uint32_t _id;
   std::unique_ptr<MessageBuilder> _msg_builder;
 };
