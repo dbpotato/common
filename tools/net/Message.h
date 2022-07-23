@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include <memory>
+#include <unistd.h>
 
 const int MESSAGE_HEADER_LENGTH = 5;
 const int MESSAGE_HEADER_TYPE_LENGTH = 1;
