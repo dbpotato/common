@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include <cstring>
 #include <memory>
 
 static const double CONNECT_TIMEOUT_IN_MS = 300.0;
@@ -43,6 +44,12 @@ public:
   Data(uint32_t size, std::shared_ptr<unsigned char> data)
       : _size(size)
       , _data(data) {
+  }
+  Data(uint32_t size, const unsigned char* data)
+      : _size(size) {
+    _data = std::shared_ptr<unsigned char>(new unsigned char[_size],
+                                           std::default_delete<unsigned char[]>());
+    std::memcpy(_data.get(), data, _size);
   }
 };
 

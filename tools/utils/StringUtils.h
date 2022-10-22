@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <algorithm>
 #include <locale>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -73,9 +74,18 @@ namespace StringUtils {
       last_pos = pos + delim.length();
       pos = str.find(delim, last_pos);
     }
-    if(last_pos < str.length() -1) {
+    if(last_pos < str.length()) {
        elements.push_back(str.substr(last_pos));
     }
     return elements;
   };
+
+  static bool ToInt(const std::string &str, int& out_value){
+    try {
+      out_value = std::stoi(str);
+    } catch (const std::invalid_argument& exc) {
+      return false;
+    }
+    return true;
+  }
 };
