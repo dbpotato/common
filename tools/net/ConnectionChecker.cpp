@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018-2020 Adam Kaniewski
+Copyright (c) 2018-2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -98,14 +98,14 @@ void ConnectionChecker::OnClientRead(std::shared_ptr<Client> client, std::shared
   SetState(ConnectionState::CONNECTED);
 }
 
-bool ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
-  DLOG(info, "ConnectionChecker::OnClientConnected() : {}", (err == NetError::OK));
-  if(err == NetError::OK) {
-    _current_client = client;
-    SetState(ConnectionState::CONNECTED);
-    return true;
-  }
-  return false;
+bool ConnectionChecker::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
+  return true;
+}
+
+void ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client) {
+  DLOG(info, "ConnectionChecker::OnClientConnected()");
+  _current_client = client;
+  SetState(ConnectionState::CONNECTED);
 }
 
 void ConnectionChecker::OnClientClosed(std::shared_ptr<Client> client) {

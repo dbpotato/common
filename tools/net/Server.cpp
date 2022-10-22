@@ -26,9 +26,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Server::Server(int raw_handle,
                std::shared_ptr<Connection> connection,
+               std::shared_ptr<SocketContext> context,
                std::vector<std::weak_ptr<ClientManager> >& listeners,
                bool is_raw)
-    : SocketObject(raw_handle, true, connection)
+    : SocketObject(raw_handle, true, connection, context)
     ,_listeners(listeners)
     ,_is_raw(is_raw) {
 }
@@ -59,22 +60,28 @@ void Server::OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> 
        listener->OnMsgSent(client, msg, success);
 }
 
-bool Server::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+bool Server::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
   if(err == NetError::OK) {
     bool accepted = true;
 
     for(auto listener_wp : _listeners) {
       if(auto listener = listener_wp.lock()) {
-        accepted = accepted && listener->OnClientConnected(client, err);
+        accepted = accepted && listener->OnClientConnecting(client, err);
       }
     }
-
-    if(accepted)
-      AddClient(client);
 
     return accepted;
   }
   return false;
+}
+
+void Server::OnClientConnected(std::shared_ptr<Client> client) {
+  AddClient(client);
+  for(auto listener_wp : _listeners) {
+    if(auto listener = listener_wp.lock()) {
+      listener->OnClientConnected(client);
+    }
+  }
 }
 
 bool Server::IsRaw() {

@@ -39,7 +39,8 @@ class ClientManager {
 public:
   virtual void OnServerCreated(std::weak_ptr<Server> server);
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
-  virtual bool OnClientConnected(std::shared_ptr<Client> client, NetError err);
+  virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err);
+  virtual void OnClientConnected(std::shared_ptr<Client> client);
   virtual void OnClientClosed(std::shared_ptr<Client> client);
   virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success);
   virtual bool IsRaw() = 0;
@@ -47,16 +48,17 @@ public:
 
 class Client : public SocketObject {
 
-friend void Connection::CreateClient(int, const std::string&, std::weak_ptr<ClientManager>);
+friend void Connection::CreateClient(int, const std::string&, std::weak_ptr<ClientManager>, std::shared_ptr<SocketContext>);
 friend void Connection::Accept(std::shared_ptr<SocketObject>);
 
 public:
-  void Send(std::shared_ptr<Message> msg);
+  bool Send(std::shared_ptr<Message> msg);
 
   void OnMsgWrite(std::shared_ptr<Message> msg, bool status);
   void OnDataRead(Data& data);
   void OnConnectionClosed() override;
-  bool OnConnected(NetError err);
+  bool OnConnecting(NetError err);
+  void OnConnected();
 
   uint32_t GetId();
   const std::string& GetUrl();
@@ -73,6 +75,7 @@ protected:
 private:
   Client(int socket_fd,
          std::shared_ptr<Connection> connection,
+         std::shared_ptr<SocketContext> context,
          const std::string& ip = {},
          int port = DEFAULT_SOCKET,
          const std::string& url = {},
@@ -83,5 +86,6 @@ private:
   std::string _url;
   std::weak_ptr<ClientManager> _manager;
   uint32_t _id;
+  bool _is_connected;
   std::unique_ptr<MessageBuilder> _msg_builder;
 };

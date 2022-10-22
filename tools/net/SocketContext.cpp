@@ -40,17 +40,22 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <errno.h>
 
 
-SocketContext::SocketContext(bool from_accept)
+SocketContext::SocketContext(SocketContext::State init_state)
     : _info(nullptr)
     , _info_next(nullptr)
     , _socket_handle(DEFAULT_SOCKET)
     , _time_passed(0.0)
-    , _state(GETTING_INFO) {
+    , _state(init_state) {
 
-  if(from_accept) {
-    _state = AFTER_ACCEPTING;
+  if(_state != GETTING_INFO &&
+     _state != AFTER_ACCEPTING &&
+     _state != FINISHED) {
+    DLOG(error, "Unexpected initialize state : {}", _state);
+    _state = FAILED;
+    return;
   }
-  else {
+
+  if(_state == GETTING_INFO) {
     memset(&_hints, 0, sizeof(struct addrinfo));
     _hints.ai_family = AF_INET;
     _hints.ai_socktype = SOCK_STREAM;

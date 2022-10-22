@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "SocketContext.h"
 #include "SocketObject.h"
 #include "Utils.h"
 
@@ -37,7 +38,6 @@ class Client;
 class ClientManager;
 class ClientOwner;
 class Server;
-class SocketContext;
 class Transporter;
 class ConnectThread;
 
@@ -50,16 +50,27 @@ friend SocketObject::~SocketObject();
 public: //TODO
   static std::shared_ptr<Connection> CreateBasic();
   virtual ~Connection();
+
   void CreateClient(int port,
                     const std::string& host,
                     std::weak_ptr<ClientManager> mgr);
+
+  void CreateClient(int port,
+                    const std::string& host,
+                    std::weak_ptr<ClientManager> mgr,
+                    std::shared_ptr<SocketContext> context);
+
+  std::shared_ptr<Server> CreateServer(int port,
+                                       std::shared_ptr<ClientManager> listener);
 
   std::shared_ptr<Server> CreateServer(int port,
                                        std::vector<std::weak_ptr<ClientManager> >& listeners,
                                        bool is_raw);
 
   std::shared_ptr<Server> CreateServer(int port,
-                                       std::shared_ptr<ClientManager> listener);
+                                       std::vector<std::weak_ptr<ClientManager> >& listeners,
+                                       bool is_raw,
+                                       std::shared_ptr<SocketContext> context);
 
   void SendMsg(std::shared_ptr<Client>, std::shared_ptr<Message> msg);
   void Accept(std::shared_ptr<SocketObject> obj);
@@ -73,7 +84,8 @@ public: //TODO
 protected: //TODO
   Connection();
   void Init();
-  virtual std::shared_ptr<SocketContext> CreateSocketContext(bool from_accept);
+
+  virtual std::shared_ptr<SocketContext> CreateAcceptSocketContext(std::shared_ptr<Server> server);
   virtual bool SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_read_size);
   virtual bool SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size);
 

@@ -38,9 +38,13 @@ void ClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr
   DLOG(warn, "ClientManager::OnClientRead : not implemented");
 }
 
-bool ClientManager::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
-  DLOG(warn, "ClientManager::OnClientConnected : not implemented");
+bool ClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
+  DLOG(warn, "ClientManager::OnClientConnecting : not implemented");
   return true;
+}
+
+void ClientManager::OnClientConnected(std::shared_ptr<Client> client) {
+  DLOG(warn, "ClientManager::OnClientConnected : not implemented");
 }
 
 void ClientManager::OnClientClosed(std::shared_ptr<Client> client) {
@@ -58,16 +62,18 @@ uint32_t Client::NextId() {
 
 Client::Client(int socket_fd,
                std::shared_ptr<Connection> connection,
+               std::shared_ptr<SocketContext> context,
                const std::string& ip,
                int port,
                const std::string& url,
                std::weak_ptr<ClientManager> manager)
-    : SocketObject(socket_fd, false, connection)
+    : SocketObject(socket_fd, false, connection, context)
     , _ip(ip)
     , _port(port)
     , _url(url)
     , _manager(manager)
-    , _id(NextId()) {
+    , _id(NextId())
+    , _is_connected(false) {
   if(auto mgr = _manager.lock()) {
     if(!mgr->IsRaw()) {
       _msg_builder.reset(new MessageBuilder());
@@ -105,24 +111,36 @@ int Client::GetPort() {
   return _port;
 }
 
-void Client::Send(std::shared_ptr<Message> msg) {
+bool Client::Send(std::shared_ptr<Message> msg) {
   if(!IsActive()) {
     DLOG(error, "Client::Send - client is not active");
-    return;
+    return false;
+  }
+  if(!_is_connected){
+    DLOG(error, "Client::Send - client is not connected");
+    return false;
   }
   msg = msg->ConvertToBaseMessage();
   _connection->SendMsg(SharedPtr(), msg);
+  return true;
 }
 
 std::shared_ptr<Client> Client::SharedPtr() {
   return std::static_pointer_cast<Client>(shared_from_this());
 }
 
-bool Client::OnConnected(NetError err) {
+bool Client::OnConnecting(NetError err) {
   if(auto manager = _manager.lock()) {
-    return manager->OnClientConnected(SharedPtr(), err);
+    return manager->OnClientConnecting(SharedPtr(), err);
   }
   return false;
+}
+
+void Client::OnConnected() {
+  _is_connected = true;
+  if(auto manager = _manager.lock()) {
+    manager->OnClientConnected(SharedPtr());
+  }
 }
 
 void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {

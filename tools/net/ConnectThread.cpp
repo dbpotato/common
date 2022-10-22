@@ -80,9 +80,10 @@ void ConnectThread::OnConnectComplete(std::shared_ptr<Client> client, NetError e
     transporter->AddSocket(client);
   }
 
-  if( (client->OnConnected(err)) &&
+  if( (client->OnConnecting(err)) &&
       (err == NetError::OK) &&
       (client->IsActive()) ) {
     transporter->EnableSocket(client);
+    client->OnConnected();
   }
 }

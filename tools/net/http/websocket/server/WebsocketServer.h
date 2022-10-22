@@ -38,7 +38,8 @@ class WebsocketServer;
 class WebsocketClientManager : public ClientManager {
 public:
   WebsocketClientManager(std::shared_ptr<WebsocketServer> owner);
-  bool OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
+  bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
+  void OnClientConnected(std::shared_ptr<Client> client) override;
   void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
   void OnClientClosed(std::shared_ptr<Client> client) override;
   bool IsRaw() override;

@@ -61,7 +61,8 @@ public:
             std::shared_ptr<HttpRequestHandler> request_handler,
             int port);
 
-  bool OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
+  bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
+  void OnClientConnected(std::shared_ptr<Client> client) override;
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
   bool IsRaw() override;
 

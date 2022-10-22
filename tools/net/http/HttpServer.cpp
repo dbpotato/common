@@ -45,10 +45,13 @@ bool HttpServer::Init(std::shared_ptr<Connection> connection,
   return (_server != nullptr);
 }
 
-bool HttpServer::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+bool HttpServer::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
+  return true;
+}
+
+void HttpServer::OnClientConnected(std::shared_ptr<Client> client) {
   auto msg_builder = std::unique_ptr<MessageBuilderHttp>(new MessageBuilderHttp());
   client->SetMsgBuilder(std::move(msg_builder));
-  return true;
 }
 
 void HttpServer::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {

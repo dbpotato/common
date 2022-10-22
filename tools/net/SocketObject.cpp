@@ -27,12 +27,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 SocketObject::SocketObject(int socket_fd,
                            bool is_server_socket,
-                           std::shared_ptr<Connection> connection)
+                           std::shared_ptr<Connection> connection,
+                           std::shared_ptr<SocketContext> context)
     : _socket_fd(socket_fd)
     , _is_server_socket(is_server_socket)
     , _is_active(true)
     , _was_fd_closed(false)
-    , _connection(connection) {
+    , _connection(connection)
+    , _context(context) {
 }
 
 SocketObject::~SocketObject() {
@@ -55,10 +57,6 @@ std::shared_ptr<SocketContext> SocketObject::GetContext() {
 
 std::shared_ptr<Connection> SocketObject::GetConnection() {
   return _connection;
-}
-
-void SocketObject::SetContext(std::shared_ptr<SocketContext> context) {
-  _context = context;
 }
 
 bool SocketObject::IsActive() {

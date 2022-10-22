@@ -42,9 +42,12 @@ WebsocketClientManager::WebsocketClientManager(std::shared_ptr<WebsocketServer> 
     : _owner(owner) {
 }
 
-bool WebsocketClientManager::OnClientConnected(std::shared_ptr<Client> client, NetError err) {
+bool WebsocketClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
   //Should never be called
   return false;
+}
+void WebsocketClientManager::OnClientConnected(std::shared_ptr<Client> client) {
+  //Should never be called
 }
 
 void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {

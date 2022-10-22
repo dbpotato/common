@@ -46,10 +46,11 @@ public:
     FAILED,
   };
 
-  SocketContext(bool from_accept);
+  SocketContext(SocketContext::State init_state = SocketContext::State::GETTING_INFO);
   ~SocketContext();
   NetError Continue(std::shared_ptr<Client> client);
   virtual bool HasReadPending() {return false;}
+  State GetState() {return _state;}
 private:
   void GetAddrInfo(std::shared_ptr<Client> client);
   void Connect(std::shared_ptr<Client> client);

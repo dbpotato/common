@@ -62,41 +62,68 @@ Connection::Connection() {
 Connection::~Connection() {
 }
 
-std::shared_ptr<SocketContext> Connection::CreateSocketContext(bool from_accept) {
-  return std::make_shared<SocketContext>(from_accept);
+void Connection::Init() {
+  _transporter = Transporter::GetInstance();
+  _connector = ConnectThread::GetInstance();
+}
+
+std::shared_ptr<SocketContext> Connection::CreateAcceptSocketContext(std::shared_ptr<Server> server) {
+  return std::make_shared<SocketContext>(SocketContext::State::AFTER_ACCEPTING);
 }
 
 void Connection::CreateClient(int port,
                               const std::string& host,
                               std::weak_ptr<ClientManager> mgr) {
+  CreateClient(port,
+               host,
+               mgr,
+               std::make_shared<SocketContext>(SocketContext::State::GETTING_INFO));
+}
+
+void Connection::CreateClient(int port,
+                              const std::string& host,
+                              std::weak_ptr<ClientManager> mgr,
+                              std::shared_ptr<SocketContext> context) {
   std::shared_ptr<Client> client;
   client.reset(new Client(DEFAULT_SOCKET,
                           shared_from_this(),
+                          context,
                           {},
                           port,
                           host,
                           mgr));
-
-  client->SetContext(CreateSocketContext(false));
   _connector->AddClient(client);
 }
 
 std::shared_ptr<Server> Connection::CreateServer(int port,
                                                  std::vector<std::weak_ptr<ClientManager> >& listeners,
                                                  bool is_raw) {
+  return CreateServer(port,
+                      listeners,
+                      is_raw,
+                      std::make_shared<SocketContext>(SocketContext::State::FINISHED));
+}
+
+std::shared_ptr<Server> Connection::CreateServer(int port,
+                                                 std::vector<std::weak_ptr<ClientManager> >& listeners,
+                                                 bool is_raw,
+                                                 std::shared_ptr<SocketContext> context) {
   std::shared_ptr<Server> server;
 
   int socket = CreateServerSocket(port);
   if(socket < 0)
     return server;
 
-  server.reset(new Server(socket, shared_from_this(), listeners, is_raw));
+  server.reset(new Server(socket,
+                          shared_from_this(),
+                          context,
+                          listeners,
+                          is_raw));
   server->Init();
   _transporter->AddSocket(server);
   _transporter->EnableSocket(server);
   return server;
 }
-
 
 std::shared_ptr<Server> Connection::CreateServer(int port,
                                     std::shared_ptr<ClientManager> listener) {
@@ -186,16 +213,17 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
                          port_buf, sizeof port_buf,
                          NI_NUMERICHOST | NI_NUMERICSERV);
 
-  if(res != 0)
+  if(res != 0) {
     DLOG(warn, "Connection::Accept getnameinfo fail");
+  }
 
   client.reset(new Client(socket,
                           shared_from_this(),
+                          CreateAcceptSocketContext(server),
                           std::string(host_buf),
                           std::stoi(std::string(port_buf)),
                           {},//url
                           server));
-  client->SetContext(CreateSocketContext(true));
   _connector->AddClient(client);
 }
 
@@ -308,11 +336,6 @@ bool Connection::Write(std::shared_ptr<Client> obj, MessageWriteRequest& req) {
 void Connection::Close(int socket_fd) {
   _transporter->RemoveSocket(socket_fd);
   close(socket_fd);
-}
-
-void Connection::Init() {
-  _transporter = Transporter::GetInstance();
-  _connector = ConnectThread::GetInstance();
 }
 
 void Connection::SendMsg(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {

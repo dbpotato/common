@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 Adam Kaniewski
+Copyright (c) 2018 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -55,7 +55,8 @@ public:
   void OnThreadStarted(int thread_id) override;
 
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
-  virtual bool OnClientConnected(std::shared_ptr<Client> client, NetError err) override;
+  virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
+  virtual void OnClientConnected(std::shared_ptr<Client> client) override;
   virtual void OnClientClosed(std::shared_ptr<Client> client) override;
   bool IsRaw() override;
 
