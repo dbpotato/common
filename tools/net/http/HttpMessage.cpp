@@ -23,6 +23,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "HttpHeader.h"
 #include "HttpMessage.h"
+#include "FileUtils.h"
+#include "MimeTypeFinder.h"
 
 #include <cstring>
 
@@ -72,6 +74,17 @@ void HttpMessage::CreateHeader(int status_code, uint32_t body_size) {
 void HttpMessage::CreateHeader(HttpHeaderMethod::Type method, const std::string& request, uint32_t body_size) {
   _header = std::make_shared<HttpHeader>(HttpHeaderProtocol::HTTP_1_1, method, request);
   _header->AddField(HttpHeaderField::CONTENT_LENGTH, std::to_string(body_size));
+}
+
+std::shared_ptr<HttpMessage> HttpMessage::FromFile(const std::string& file_path) {
+  std::shared_ptr<unsigned char> data;
+  size_t data_size = 0;
+  if(!FileUtils::ReadFile(file_path, data, data_size)) {
+    return nullptr;
+  }
+  auto msg = std::make_shared<HttpMessage>(200, (uint32_t)data_size, data.get());
+  msg->GetHeader()->AddField(HttpHeaderField::CONTENT_TYPE, MimeTypeFinder::Find(file_path));
+  return msg;
 }
 
 std::shared_ptr<Message> HttpMessage::ConvertToBaseMessage() {

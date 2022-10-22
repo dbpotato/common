@@ -53,6 +53,7 @@ public :
 
   std::shared_ptr<Message> ConvertToBaseMessage() override;
   std::shared_ptr<HttpHeader> GetHeader();
+  static std::shared_ptr<HttpMessage> FromFile(const std::string& file_path);
 
 private :
   void CreateHeader(int status_code, uint32_t body_size);
