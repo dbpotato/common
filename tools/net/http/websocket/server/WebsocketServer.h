@@ -44,7 +44,7 @@ public:
   void OnClientClosed(std::shared_ptr<Client> client) override;
   bool IsRaw() override;
 private:
-  std::shared_ptr<WebsocketServer> _owner;
+  std::weak_ptr<WebsocketServer> _owner;
 };
 
 class WebsocketClientListener {

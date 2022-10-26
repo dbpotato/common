@@ -51,22 +51,27 @@ void WebsocketClientManager::OnClientConnected(std::shared_ptr<Client> client) {
 }
 
 void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
+  auto server = _owner.lock();
+  if(!server) {
+    return;
+  }
+
   std::shared_ptr<WebsocketMessage> websocket_msg = std::static_pointer_cast<WebsocketMessage>(msg);
   auto header = websocket_msg->_header;
 
   switch (header->_opcode) {
     case WebsocketHeader::TEXT:
     case WebsocketHeader::BINARY:
-      _owner->OnWsMessage(client, websocket_msg);
+      server->OnWsMessage(client, websocket_msg);
       break;
     case WebsocketHeader::CLOSE:
-      _owner->OnWsClose(client);
+      server->OnWsClose(client);
       break;
     case WebsocketHeader::PING:
-      _owner->OnWsPing(client, websocket_msg);
+      server->OnWsPing(client, websocket_msg);
       break;
     case WebsocketHeader::PONG:
-      _owner->OnWsPong(client);
+      server->OnWsPong(client);
       break;
     default:
       DLOG(error, "Invalid op code : {}", header->_opcode);
