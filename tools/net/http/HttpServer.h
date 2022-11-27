@@ -60,9 +60,11 @@ public:
   bool Init(std::shared_ptr<Connection> connection,
             std::shared_ptr<HttpRequestHandler> request_handler,
             int port);
+  bool Init(std::shared_ptr<HttpRequestHandler> request_handler,
+            std::shared_ptr<Server> server);
 
-  bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
-  void OnClientConnected(std::shared_ptr<Client> client) override;
+  virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
+  virtual void OnClientConnected(std::shared_ptr<Client> client) override;
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
   bool IsRaw() override;
 
