@@ -31,6 +31,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 namespace FileUtils {
+  static bool FileExists(const std::string& file_path) {
+    std::ifstream stream(file_path, std::ios::binary | std::ios::ate);
+    if(!stream.is_open()) {
+      return false;
+    }
+    stream.close();
+    return true;
+  }
+
   static bool ReadFile(const std::string& file_path,
                        std::shared_ptr<unsigned char>& out_data,
                        size_t& out_data_size) {
@@ -45,6 +54,18 @@ namespace FileUtils {
     result = stream.read((char*)(out_data.get()), out_data_size).good();
     stream.close();
     return result;
+  }
+
+  static bool ReadFile(const std::string& file_path,
+                       std::string& out_body) {
+    bool result = true;
+    std::shared_ptr<unsigned char> data;
+    size_t data_size = 0;
+    if(!ReadFile(file_path, data, data_size)){
+      return false;
+    }
+    out_body = std::string((const char*)data.get(), data_size);
+    return true;
   }
 
   static bool SaveFile(const std::string& file_path,
