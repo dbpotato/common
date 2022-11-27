@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -64,7 +64,7 @@ bool SocketObject::IsActive() {
 }
 
 bool SocketObject::IsValid() {
-  return _socket_fd != DEFAULT_SOCKET;
+  return (_socket_fd != DEFAULT_SOCKET) && !_was_fd_closed;
 }
 
 void SocketObject::SetActive(bool is_active) {

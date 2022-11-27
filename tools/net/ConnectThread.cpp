@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2021 Adam Kaniewski
+Copyright (c) 2020 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -80,10 +80,10 @@ void ConnectThread::OnConnectComplete(std::shared_ptr<Client> client, NetError e
     transporter->AddSocket(client);
   }
 
-  if( (client->OnConnecting(err)) &&
-      (err == NetError::OK) &&
-      (client->IsActive()) ) {
-    transporter->EnableSocket(client);
+  if((client->OnConnecting(err)) && (err == NetError::OK)) {
+    if(client->IsActive()) {
+      transporter->EnableSocket(client);
+    }
     client->OnConnected();
   }
 }

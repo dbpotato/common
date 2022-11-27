@@ -41,7 +41,8 @@ SocketContextMtls::SocketContextMtls(SocketContext::State init_state, std::share
     : SocketContext(init_state)
     , _read_pending(false)
     , _ssl_verify(false)
-    , _last_ssl_error(0) {
+    , _last_ssl_error(0)
+    , _last_read_value(0) {
 
   mbedtls_ssl_init(&_ssl_context);
   mbedtls_ssl_config_init(&_ssl_conf);
@@ -195,8 +196,11 @@ bool SocketContextMtls::Write(void* buffer, int size, int& out_write_size) {
 
 bool SocketContextMtls::Read(void* dest, int dest_size, int& out_read_size) {
   int read_value = mbedtls_ssl_read(&_ssl_context, (unsigned char*)dest, dest_size);
+  int previuos_read_value = _last_read_value;
+  _last_read_value = read_value;
+
   if((read_value == MBEDTLS_ERR_SSL_WANT_READ) || (read_value == MBEDTLS_ERR_SSL_WANT_WRITE)) {
-    _read_pending = true;
+    _read_pending = (previuos_read_value != dest_size);
     out_read_size = 0;
     return true;
   } else if(read_value <= 0) {

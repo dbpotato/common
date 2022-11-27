@@ -66,9 +66,11 @@ public:
 private:
   Transporter();
   void Init();
-  void SendPending(std::shared_ptr<Client> client);
+  void SendWritePending(std::shared_ptr<Client> client);
+  void SendReadPending();
 
   std::map<int, std::vector<MessageWriteRequest>> _write_reqs;
+  std::vector<std::shared_ptr<SocketObject>> _read_reqs;
   static std::weak_ptr<Transporter> _instance;
   std::map<int, SocketInfo> _sockets;
   std::shared_ptr<Epool> _epool;

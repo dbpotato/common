@@ -111,8 +111,9 @@ std::shared_ptr<Server> Connection::CreateServer(int port,
   std::shared_ptr<Server> server;
 
   int socket = CreateServerSocket(port);
-  if(socket < 0)
+  if(socket < 0) {
     return server;
+  }
 
   server.reset(new Server(socket,
                           shared_from_this(),
@@ -156,20 +157,22 @@ int Connection::CreateServerSocket(int port) {
 
   for (rp = result; rp; rp = rp->ai_next) {
     sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-    if (sfd == DEFAULT_SOCKET)
+    if (sfd == DEFAULT_SOCKET) {
       continue;
+    }
 
     fcntl(sfd, F_SETFL, O_NONBLOCK);
 
     int reuse = 1;
-    if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) == -1)
+    if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) == -1) {
       DLOG(warn, "Connection::CreateSocket set SO_REUSEADDR fail");
-    else if(bind(sfd, rp->ai_addr, rp->ai_addrlen) == -1)
+    } else if(bind(sfd, rp->ai_addr, rp->ai_addrlen) == -1) {
       DLOG(warn, "Connection::CreateSocket bind fail");
-    else if(listen(sfd, SOC_LISTEN) == -1)
+    } else if(listen(sfd, SOC_LISTEN) == -1) {
       DLOG(warn, "Connection::CreateSocket listen fail");
-    else
+    } else {
       break;
+    }
 
     close(sfd);
     sfd = DEFAULT_SOCKET;
@@ -204,7 +207,6 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
 
   fcntl(socket, F_SETFL, O_NONBLOCK);
 
-
   char host_buf[NI_MAXHOST];
   char port_buf[NI_MAXSERV];
 
@@ -232,47 +234,48 @@ NetError Connection::AfterSocketAccepted(std::shared_ptr<SocketObject> obj) {
 }
 
 void Connection::NotifySocketActiveChanged(std::shared_ptr<SocketObject> obj) {
-  if(obj->IsActive())
+  if(obj->IsActive()) {
     _transporter->EnableSocket(obj);
-  else
+  } else {
     _transporter->DisableSocket(obj);
+  }
 }
 
-void Connection::ProcessSocket(std::shared_ptr<SocketObject> obj) {
-  if(obj->IsServerSocket())
+bool Connection::ProcessSocket(std::shared_ptr<SocketObject> obj) {
+  if(obj->IsServerSocket()) {
     Accept(obj);
-  else
-    Read(std::static_pointer_cast<Client>(obj));
+    return false;
+  } else {
+    return Read(std::static_pointer_cast<Client>(obj));
+  }
 }
 
-void Connection::Read(std::shared_ptr<Client> obj) {
+bool Connection::Read(std::shared_ptr<Client> obj) {
   Data data;
   int read_len = 0;
   unsigned char buff[SOC_READ_BUFF_SIZE];
 
-  do {
-    bool res = SocketRead(obj, buff, SOC_READ_BUFF_SIZE, read_len);
+  bool res = SocketRead(obj, buff, SOC_READ_BUFF_SIZE, read_len);
+  if (!res) {
+    obj->OnConnectionClosed();
+    Close(obj->SocketFd());
+    return false;
+  }
 
-    if (!res) {
-      obj->OnConnectionClosed();
-      Close(obj->SocketFd());
-      return;
-    }
-
-    if(read_len > 0) {
-      std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len],
-                                               std::default_delete<unsigned char[]>());
-      std::memcpy(data_sptr.get(), (void*)(buff), read_len);
-      data._size = read_len;
-      data._data = data_sptr;
-      obj->OnDataRead(data);
-    }
-  } while(obj->GetContext()->HasReadPending());
+  if(read_len > 0) {
+    std::shared_ptr<unsigned char> data_sptr(new unsigned char[read_len],
+                                            std::default_delete<unsigned char[]>());
+    std::memcpy(data_sptr.get(), (void*)(buff), read_len);
+    data._size = read_len;
+    data._data = data_sptr;
+    obj->OnDataRead(data);
+  }
+  return (obj->GetContext()->HasReadPending()) || (read_len == SOC_READ_BUFF_SIZE);
 }
 
 bool Connection::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, int& out_dest_write) {
   out_dest_write = read(obj->SocketFd(), dest, dest_size);
-  return out_dest_write > 0;
+  return (out_dest_write != 0);
 }
 
 bool Connection::SocketWrite(std::shared_ptr<Client> obj, void* buffer, int size, int& out_write_size) {
@@ -323,12 +326,13 @@ bool Connection::Write(std::shared_ptr<Client> obj, MessageWriteRequest& req) {
     }
   }
 
-  if((req._write_offset == total_size) || failed )
+  if((req._write_offset == total_size) || failed) {
     completed = true;
+  }
 
-  if(completed)
+  if(completed) {
     obj->OnMsgWrite(msg, !failed);
-
+  }
 
   return completed;
 }
@@ -339,11 +343,8 @@ void Connection::Close(int socket_fd) {
 }
 
 void Connection::SendMsg(std::shared_ptr<Client> obj, std::shared_ptr<Message> msg) {
-  //TODO is active check
-
   MessageWriteRequest req(msg);
-
-  if(!Write(obj, req))
+  if(!Write(obj, req)) {
     _transporter->AddSendRequest(obj->SocketFd(), req);
+  }
 }
-

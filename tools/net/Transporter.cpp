@@ -182,7 +182,9 @@ void Transporter::OnSocketEvents(std::vector<std::pair<int, SocketEventListener:
 
      if(event.CanRead()) {
        if(socket_obj->IsActive()) {
-         socket_obj->GetConnection()->ProcessSocket(socket_obj);
+         if(socket_obj->GetConnection()->ProcessSocket(socket_obj)) {
+          _read_reqs.emplace_back(socket_obj);
+         }
        }
        else {
          wrapper._pending_read = true;
@@ -191,7 +193,7 @@ void Transporter::OnSocketEvents(std::vector<std::pair<int, SocketEventListener:
 
      if(event.CanWrite()) {
        if(!socket_obj->IsServerSocket()) {
-         SendPending(std::static_pointer_cast<Client>(socket_obj));
+         SendWritePending(std::static_pointer_cast<Client>(socket_obj));
        }
      }
 
@@ -202,12 +204,21 @@ void Transporter::OnSocketEvents(std::vector<std::pair<int, SocketEventListener:
      }
    }
 
+  if(_read_reqs.size()) {
+    _thread_loop->Post(std::bind(&Transporter::SendReadPending, shared_from_this()));
+  }
+
    _epool->NotifyEventsHandled();
 }
 
-void Transporter::SendPending(std::shared_ptr<Client> client) {
+void Transporter::SendWritePending(std::shared_ptr<Client> client) {
   int socket_fd = client->SocketFd();
   auto it = _write_reqs.find(socket_fd);
+
+  if(it == _write_reqs.end()) {
+    return;
+  }
+
   auto& req_vec = it->second;
 
   for(auto vec_it = req_vec.begin(); vec_it != req_vec.end();) {
@@ -223,6 +234,22 @@ void Transporter::SendPending(std::shared_ptr<Client> client) {
   if(!req_vec.size()) {
     _write_reqs.erase(socket_fd);
     _epool->SetFlags(socket_fd, true, false);
+  }
+}
+
+void Transporter::SendReadPending() {
+  for(auto vec_it = _read_reqs.begin(); vec_it != _read_reqs.end();) {
+    auto socket_obj = *vec_it;
+    if(socket_obj->IsValid()) {
+      if(!socket_obj->GetConnection()->ProcessSocket(socket_obj)) {
+        vec_it = _read_reqs.erase(vec_it);
+      }
+    } else {
+      vec_it = _read_reqs.erase(vec_it);
+    }
+  }
+  if(_read_reqs.size()) {
+    _thread_loop->Post(std::bind(&Transporter::SendReadPending, shared_from_this()));
   }
 }
 

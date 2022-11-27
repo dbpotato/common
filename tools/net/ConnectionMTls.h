@@ -74,6 +74,7 @@ private:
   bool _read_pending;
   bool _ssl_verify;
   int _last_ssl_error;
+  int _last_read_value;
   mbedtls_ssl_context _ssl_context;
   mbedtls_ssl_config _ssl_conf;
   mbedtls_x509_crt _owned_cert;

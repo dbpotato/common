@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2022 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -121,6 +121,10 @@ bool Client::Send(std::shared_ptr<Message> msg) {
     return false;
   }
   msg = msg->ConvertToBaseMessage();
+  if(!msg) {
+    DLOG(error, "Client::Send - message is not valid");
+    return false;
+  }
   _connection->SendMsg(SharedPtr(), msg);
   return true;
 }

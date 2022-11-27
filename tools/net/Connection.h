@@ -91,10 +91,10 @@ protected: //TODO
 
   int CreateServerSocket(int port);
 
-  void ProcessSocket(std::shared_ptr<SocketObject> obj);
+  bool ProcessSocket(std::shared_ptr<SocketObject> obj);
   void ProcessUnfinishedSocket(std::shared_ptr<SocketObject> obj);
 
-  void Read(std::shared_ptr<Client> obj);
+  bool Read(std::shared_ptr<Client> obj);
   bool Write(std::shared_ptr<Client> obj, MessageWriteRequest& req);
   void Close(int socket_fd);
 
