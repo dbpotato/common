@@ -33,10 +33,18 @@ class MessageBuilderHttp : public MessageBuilder{
 public:
   MessageBuilderHttp();
 private:
+  enum BodyTransferMode {
+    UNKNOWN = 0,
+    CONTENT_LENGTH,
+    CHUNKED,
+    NONE
+  };
+  bool IsMessageCompleted();
   void Check(std::vector<std::shared_ptr<Message> >& out_msgs) override;
   void MaybeGetHeaderData() override;
   std::shared_ptr<Message> CreateMessage() override;
-  int _content_lenght;
+  int _content_length;
   int _content_pos;
   std::shared_ptr<HttpHeader> _header;
+  BodyTransferMode _mode;
 };
