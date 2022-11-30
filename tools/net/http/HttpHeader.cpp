@@ -55,6 +55,10 @@ void HttpHeader::AddField(HttpHeaderField::Type type, const std::string& value) 
   _fields.insert(std::make_pair(type, value));
 }
 
+void HttpHeader::AddField(const std::string& key, const std::string& value) {
+  _unknown_fields.insert(std::make_pair(key, value));
+}
+
 bool HttpHeader::HasField(HttpHeaderField::Type type) {
   auto it = _fields.find(type);
   return (it != _fields.end());
@@ -67,6 +71,10 @@ bool HttpHeader::GetFieldValue(HttpHeaderField::Type type, std::string& out_valu
     }
     out_value = it->second;
     return true;
+}
+
+const std::map<std::string, std::string>& HttpHeader::GetUnknownFields() {
+  return _unknown_fields;
 }
 
 std::shared_ptr<HttpHeader> HttpHeader::Parse(const std::string& header_str) {
@@ -94,11 +102,11 @@ std::shared_ptr<HttpHeader> HttpHeader::Parse(const std::string& header_str) {
       DLOG(warn, "HttpHeader::Parse : failed to split field line :{}", header_lines.at(i));
       continue;
     }
-    if(!HttpHeaderField::GetTypeFromString(key, key_type)) {
-      DLOG(info, "HttpHeader::Parse : failed to find field type :{}", key);
-      continue;
+    if(HttpHeaderField::GetTypeFromString(key, key_type)) {
+      new_header->AddField(key_type, value);
+    } else {
+      new_header->AddField(key, value);
     }
-    new_header->AddField(key_type, value);
   }
   return new_header;
 }
@@ -183,6 +191,11 @@ std::string HttpHeader::ToString() {
 
   for(auto field_val : _fields) {
     str_stream << HttpHeaderField::GetStringFromType(field_val.first) << ": "
+               << field_val.second << "\r\n";
+  }
+
+  for(auto field_val : _unknown_fields) {
+    str_stream << field_val.first << ": "
                << field_val.second << "\r\n";
   }
 
