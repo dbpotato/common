@@ -68,12 +68,12 @@ HttpMessage::HttpMessage(uint32_t body_size,
 
 void HttpMessage::CreateHeader(int status_code, uint32_t body_size) {
   _header = std::make_shared<HttpHeader>(HttpHeaderProtocol::HTTP_1_1, status_code);
-  _header->AddField(HttpHeaderField::CONTENT_LENGTH, std::to_string(body_size));
+  _header->SetField(HttpHeaderField::CONTENT_LENGTH, std::to_string(body_size));
 }
 
 void HttpMessage::CreateHeader(HttpHeaderMethod::Type method, const std::string& request, uint32_t body_size) {
   _header = std::make_shared<HttpHeader>(HttpHeaderProtocol::HTTP_1_1, method, request);
-  _header->AddField(HttpHeaderField::CONTENT_LENGTH, std::to_string(body_size));
+  _header->SetField(HttpHeaderField::CONTENT_LENGTH, std::to_string(body_size));
 }
 
 std::shared_ptr<HttpMessage> HttpMessage::FromFile(const std::string& file_path) {
@@ -83,7 +83,7 @@ std::shared_ptr<HttpMessage> HttpMessage::FromFile(const std::string& file_path)
     return nullptr;
   }
   auto msg = std::make_shared<HttpMessage>(200, (uint32_t)data_size, data.get());
-  msg->GetHeader()->AddField(HttpHeaderField::CONTENT_TYPE, MimeTypeFinder::Find(file_path));
+  msg->GetHeader()->SetField(HttpHeaderField::CONTENT_TYPE, MimeTypeFinder::Find(file_path));
   return msg;
 }
 

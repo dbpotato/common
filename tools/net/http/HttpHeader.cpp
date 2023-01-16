@@ -51,13 +51,24 @@ HttpHeader::HttpHeader(HttpHeaderProtocol::Type protocol, HttpHeaderMethod::Type
     , _request_target(request) {
 }
 
-void HttpHeader::AddField(HttpHeaderField::Type type, const std::string& value) {
-  _fields.insert(std::make_pair(type, value));
+void HttpHeader::SetField(HttpHeaderField::Type type, const std::string& value) {
+  auto it = _fields.find(type);
+  if(it != _fields.end()) {
+    it->second = value;
+  } else {
+    _fields.insert(std::make_pair(type, value));
+  }
 }
 
-void HttpHeader::AddField(const std::string& key, const std::string& value) {
-  _unknown_fields.insert(std::make_pair(key, value));
+void HttpHeader::SetField(const std::string& key, const std::string& value) {
+  auto it = _unknown_fields.find(key);
+  if(it != _unknown_fields.end()) {
+    it->second = value;
+  } else {
+    _unknown_fields.insert(std::make_pair(key, value));
+  }
 }
+
 
 bool HttpHeader::HasField(HttpHeaderField::Type type) {
   auto it = _fields.find(type);
@@ -103,9 +114,9 @@ std::shared_ptr<HttpHeader> HttpHeader::Parse(const std::string& header_str) {
       continue;
     }
     if(HttpHeaderField::GetTypeFromString(key, key_type)) {
-      new_header->AddField(key_type, value);
+      new_header->SetField(key_type, value);
     } else {
-      new_header->AddField(key, value);
+      new_header->SetField(key, value);
     }
   }
   return new_header;

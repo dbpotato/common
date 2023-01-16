@@ -35,8 +35,8 @@ public :
   HttpHeader(HttpHeaderProtocol::Type protocol, int status_code);
   HttpHeader(HttpHeaderProtocol::Type protocol, HttpHeaderMethod::Type method, const std::string& request);
   static std::shared_ptr<HttpHeader> Parse(const std::string& header_str);
-  void AddField(HttpHeaderField::Type, const std::string& value);
-  void AddField(const std::string& key, const std::string& value);
+  void SetField(HttpHeaderField::Type, const std::string& value);
+  void SetField(const std::string& key, const std::string& value);
   bool HasField(HttpHeaderField::Type type);
   bool GetFieldValue(HttpHeaderField::Type type, std::string& out_value);
   const std::map<std::string, std::string>& GetUnknownFields();

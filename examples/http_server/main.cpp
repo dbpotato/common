@@ -63,7 +63,7 @@ void HttpRequestHandlerImpl::Handle(HttpRequest& request) {
   if(!request_header->GetRequestTarget().compare("/")) {
     //redirect to index.html
     request._response_msg = std::make_shared<HttpMessage>(301);
-    request._response_msg->GetHeader()->AddField(HttpHeaderField::LOCATION, "/index.html");
+    request._response_msg->GetHeader()->SetField(HttpHeaderField::LOCATION, "/index.html");
     return;
   }
   if(!request_header->GetRequestTarget().compare("/index.html")) {
