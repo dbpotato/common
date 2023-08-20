@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -53,18 +53,77 @@ WebsocketHeader::WebsocketHeader()
   _mask_key[0] = _mask_key[1] = _mask_key[2] = _mask_key[3] = 0;
 }
 
-std::shared_ptr<WebsocketHeader> WebsocketHeader::MaybeCreateFromRawData(uint32_t data_size,
-                                                                         std::shared_ptr<unsigned char> data) {
+WebsocketHeader::WebsocketHeader(OpCode code, uint32_t data_length)
+    : WebsocketHeader() {
+  _opcode = (uint8_t)code;
+  _final_payload_len = data_length;
+  CreateBinaryForm();
+}
+
+bool WebsocketHeader::HasControlOpCode() {
+  return (_opcode >= (uint8_t) OpCode::CLOSE) && (_opcode <= (uint8_t) OpCode::PONG);
+}
+
+bool WebsocketHeader::HasFinFlag() {
+  return _fin;
+}
+
+std::shared_ptr<Data> WebsocketHeader::GetBinaryForm() {
+  return _binary_form;
+}
+
+void WebsocketHeader::CreateBinaryForm() {
+  int header_size_in_bytes = 2;
+  uint8_t header_start = 128 + _opcode;
+  uint8_t mask_with_payload_size = 0;
+  int payload_field_bit_size = 7;
+  if(_final_payload_len <= 125 ) {
+    mask_with_payload_size = _final_payload_len;
+  } else if(_final_payload_len > 125 ) {
+    payload_field_bit_size = 16;
+    header_size_in_bytes = 4;
+    mask_with_payload_size = 126;
+    int bit_lenght_for_data_size = (int)log2(_final_payload_len) + 1;
+    if(bit_lenght_for_data_size > 16) {
+      payload_field_bit_size = 64;
+      header_size_in_bytes = 10;
+      mask_with_payload_size = 127;
+    }
+  }
+
+  auto header_data = std::shared_ptr<unsigned char>(new unsigned char[header_size_in_bytes],
+                                          std::default_delete<unsigned char[]>());
+  std::memcpy(header_data.get(), &header_start, 1);
+  std::memcpy(header_data.get() +1 , &mask_with_payload_size, 1);
+  if(payload_field_bit_size > 7) {
+    if(payload_field_bit_size == 16) {
+      uint16_t size = _final_payload_len;
+      size = htobe16(size);
+      std::memcpy(header_data.get() + 2, &size, 2);
+    }
+    else {
+      uint64_t size = _final_payload_len;
+      size = htobe64(size);
+      std::memcpy(header_data.get() + 2, &size, 8);
+    }
+  }
+  _binary_form = std::make_shared<Data>(header_size_in_bytes, header_data);
+}
+
+std::shared_ptr<WebsocketHeader> WebsocketHeader::MaybeCreateFromRawData(std::shared_ptr<Data> data) {
   std::shared_ptr<WebsocketHeader> header = std::make_shared<WebsocketHeader>();
-  if(data_size < START_SIZE) {
+  if(data->GetCurrentSize() < START_SIZE) {
     return {};
   }
 
-  header->ParseFirstBytes(data.get()[0], data.get()[1]);
-  if(!header->FindPayloadAndHeaderSize(data_size, data)) {
+  auto data_buff =  data->GetCurrentDataRaw();
+
+  header->ParseFirstBytes(data_buff[0], data_buff[1]);
+  if(!header->FindPayloadAndHeaderSize(data)) {
     return {};
   }
   header->FindMaskKey(data);
+  data->AddOffset(header->_header_length);
 
   return header;
 }
@@ -81,26 +140,26 @@ void WebsocketHeader::ParseFirstBytes(uint8_t header_start, uint8_t mask_with_pa
   _payload_len = extract_bits(mask_with_payload_set, 1, 7).to_ulong();
 }
 
-bool WebsocketHeader::FindPayloadAndHeaderSize(uint32_t data_size, std::shared_ptr<unsigned char> data) {
+bool WebsocketHeader::FindPayloadAndHeaderSize(std::shared_ptr<Data> data) {
   int payload_extra_size = 0;
 
   if(_payload_len == 126) {
-    if(data_size < START_SIZE + LONGER_PAYLOAD_SIZE) {
-      DLOG(error, "Recived data amount is less than excepted : {} vs {}", data_size, START_SIZE + LONGER_PAYLOAD_SIZE);
+    if(data->GetCurrentSize() < START_SIZE + LONGER_PAYLOAD_SIZE) {
+      DLOG(error, "Recived data amount is less than excepted : {} vs {}", data->GetCurrentSize(), START_SIZE + LONGER_PAYLOAD_SIZE);
       return false;
     }
     uint16_t longer_payload = 0;
-    std::memcpy(&longer_payload, data.get() + START_SIZE, LONGER_PAYLOAD_SIZE);
+    std::memcpy(&longer_payload, data->GetCurrentDataRaw() + START_SIZE, LONGER_PAYLOAD_SIZE);
     longer_payload = be16toh(longer_payload);
     _final_payload_len = (uint32_t)longer_payload;
     payload_extra_size = LONGER_PAYLOAD_SIZE;
   } else if(_payload_len == 127) {
-    if(data_size < START_SIZE + LONGEST_PAYLOAD_SIZE) {
-      DLOG(error, "Recived data amount is less than excepted : {} vs {}", data_size, START_SIZE + LONGEST_PAYLOAD_SIZE);
+    if(data->GetCurrentSize() < START_SIZE + LONGEST_PAYLOAD_SIZE) {
+      DLOG(error, "Recived data amount is less than excepted : {} vs {}", data->GetCurrentSize(), START_SIZE + LONGEST_PAYLOAD_SIZE);
       return false;
     }
     uint64_t longest_payload = 0;
-    std::memcpy(&longest_payload, data.get() + START_SIZE, LONGEST_PAYLOAD_SIZE);
+    std::memcpy(&longest_payload, data->GetCurrentDataRaw() + START_SIZE, LONGEST_PAYLOAD_SIZE);
     longest_payload = be64toh(longest_payload);
     _final_payload_len = (uint32_t)longest_payload;
     payload_extra_size = LONGEST_PAYLOAD_SIZE;
@@ -110,11 +169,11 @@ bool WebsocketHeader::FindPayloadAndHeaderSize(uint32_t data_size, std::shared_p
 
   _header_length = START_SIZE + payload_extra_size + (_mask ? MASK_KEY_SIZE : 0);
 
-  return (_header_length <= data_size);
+  return (_header_length <= data->GetCurrentSize());
 }
 
-void WebsocketHeader::FindMaskKey(std::shared_ptr<unsigned char> data) {
+void WebsocketHeader::FindMaskKey(std::shared_ptr<Data> data) {
   if(_mask) {
-    std::memcpy(_mask_key, data.get() + _header_length - MASK_KEY_SIZE , MASK_KEY_SIZE);
+    std::memcpy(_mask_key, data->GetCurrentDataRaw() + _header_length - MASK_KEY_SIZE , MASK_KEY_SIZE);
   }
 }

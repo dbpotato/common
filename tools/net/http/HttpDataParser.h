@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,37 +23,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Message.h"
+#include "Data.h"
 
-#include <memory>
-#include <vector>
+class HttpHeader;
 
-
-class WebsocketMessage;
-class WebsocketHeader;
-class WebsocketFragmentBuilder;
-class WebsocketDataCutter;
-
-class WebsocketMessageBuilder : public MessageBuilder {
+class HttpDataParser {
 public:
-  enum BuilderState {
-    AWAITING_HEADER = 0,
-    HEADER_PARSE_FAILED,
-    RECEIVING_MESSAGE_BODY,
-    MESSGAE_FRAGMENT_COMPLETED,
-    MESSGAE_COMPLETED
-  };
-  WebsocketMessageBuilder();
-  bool AddData(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) override;
-  void SetState(BuilderState state);
-
-private:
-  void OnHeaderParseFailed();
-  std::shared_ptr<WebsocketMessage> OnMessageData();
-  std::shared_ptr<WebsocketMessage> OnMessageFragmentCompleted();
-  std::shared_ptr<WebsocketMessage> OnMessageCompleted();
-
-  std::unique_ptr<WebsocketDataCutter> _msg_cutter;
-  std::unique_ptr<WebsocketFragmentBuilder> _fragment_builder;
-  BuilderState _builder_state;
+  static std::shared_ptr<HttpHeader> FindContentDataHeader(std::shared_ptr<Data> data,
+                                                          uint32_t& out_expected_cut_size,
+                                                          bool& header_err);
+  static bool FindChunkDataHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size);
+  static bool FindChunkDataFooter(std::shared_ptr<Data> data);
 };

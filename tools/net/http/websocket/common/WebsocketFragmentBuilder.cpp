@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -21,63 +21,24 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+
 #include "WebsocketFragmentBuilder.h"
-#include "WebsocketMessage.h"
-#include "WebsocketHeader.h"
-#include "Logger.h"
+#include "DataResource.h"
 
-#include <cstring>
 
-WebsocketFragmentBuilder::WebsocketFragmentBuilder()
-    : _original_opcode(0)
-    , _collected_size(0) {
+WebsocketFragmentBuilder::WebsocketFragmentBuilder(uint8_t op_code, std::shared_ptr<DataResource> fragment)
+    : _opcode(op_code)
+    , _resource(fragment) {
 }
 
-bool WebsocketFragmentBuilder::AddFragment(std::shared_ptr<WebsocketMessage> fragment) {
-  std::shared_ptr<WebsocketHeader> header = fragment->_header;
-  if(!_collected_fragments.size()) {
-    if(header->_fin || !header->_opcode) {
-      log()->error("WebsocketFragmentBuilder : Invalid initial frame");
-      return false;
-    } else {
-      _original_opcode = header->_opcode;
-    }
-  } else {
-    if((header->_fin && fragment->_header->_opcode) ||
-        (!fragment->_header->_fin && fragment->_header->_opcode) ) {
-      return false;
-    }
-  }
-
-  _collected_size += fragment->_size;
-  _collected_fragments.push_back(Data(fragment->_size, fragment->_data));
-
-  return true;
+bool WebsocketFragmentBuilder::AddFragment(std::shared_ptr<DataResource> fragment) {
+  return _resource->AddData(fragment);
 }
 
-std::shared_ptr<WebsocketMessage> WebsocketFragmentBuilder::MergeFragments() {
-  if(!_collected_fragments.size()) {
-    return {};
-  }
+std::shared_ptr<DataResource> WebsocketFragmentBuilder::GetResource() {
+  return _resource;
+}
 
-  std::shared_ptr<WebsocketHeader> new_header = std::make_shared<WebsocketHeader>();
-  new_header->_fin = 1;
-  new_header->_opcode = _original_opcode;
-  new_header->_final_payload_len = _collected_size;
-
-  std::shared_ptr<unsigned char> payload_data;
-
-  if(_collected_size) {
-    payload_data = std::shared_ptr<unsigned char>(new unsigned char[_collected_size],
-                                                       std::default_delete<unsigned char[]>());
-    uint32_t offset = 0;
-    for(Data& data : _collected_fragments) {
-      std::memcpy(payload_data.get() + offset, data._data.get(), data._size);
-      offset += data._size;
-    }
-  }
-
-  std::shared_ptr<WebsocketMessage> result = std::make_shared<WebsocketMessage>(_collected_size, payload_data);
-  result->_header = new_header;
-  return result;
+uint8_t WebsocketFragmentBuilder::GetOpcode() {
+  return _opcode;
 }

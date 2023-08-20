@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2020 Adam Kaniewski
+Copyright (c) 2019 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,11 +23,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "Utils.h"
+
 #include <string>
 #include <memory>
 #include <netdb.h>
-
-#include "Utils.h"
 
 
 class Client;
@@ -41,6 +41,8 @@ public:
     CONNECTING,
     AFTER_CONNECTING,
     AFTER_ACCEPTING,
+    AWAIT_READ,
+    AWAIT_WRITE,
     FINISHED,
     TIMEOUT,
     FAILED,
@@ -48,8 +50,9 @@ public:
 
   SocketContext(SocketContext::State init_state = SocketContext::State::GETTING_INFO);
   ~SocketContext();
-  NetError Continue(std::shared_ptr<Client> client);
+  NetError Continue(std::shared_ptr<Client> client, bool on_read_write_available = false);
   virtual bool HasReadPending() {return false;}
+  bool AwaitsConnectingReadWrite();
   State GetState() {return _state;}
 private:
   void GetAddrInfo(std::shared_ptr<Client> client);
@@ -65,8 +68,10 @@ private:
   addrinfo _hints;
   addrinfo* _info;
   addrinfo* _info_next;
-  int _socket_handle;
+  int _socket_fd;
   double _time_passed;
   State _state;
+  State _previous_state;
   std::string _ip;
+  bool _awaits_read_write;
 };

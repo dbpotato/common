@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2022 Adam Kaniewski
+Copyright (c) 2018 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -38,8 +38,8 @@ SocketObject::SocketObject(int socket_fd,
 }
 
 SocketObject::~SocketObject() {
-  if(!_was_fd_closed && IsValid()) {
-    _connection->Close(_socket_fd);
+  if(IsValid()) {
+    _connection->OnSocketDestroyed(_socket_fd);
   }
 }
 

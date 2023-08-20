@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2022 Adam Kaniewski
+Copyright (c) 2018 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Client.h"
+#include "Data.h"
 #include "Message.h"
 #include "Logger.h"
 #include "Connection.h"
@@ -53,6 +54,11 @@ void ClientManager::OnClientClosed(std::shared_ptr<Client> client) {
 void ClientManager::OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) {
 }
 
+void ClientManager::OnMsgBuilderError(std::shared_ptr<Client> client) {
+  DLOG(warn, "ClientManager::OnMsgBuilderError - closing client");
+  OnClientClosed(client);
+}
+
 
 uint32_t Client::NextId() {
   if(_id_counter == std::numeric_limits<uint32_t>::max())
@@ -74,11 +80,6 @@ Client::Client(int socket_fd,
     , _manager(manager)
     , _id(NextId())
     , _is_connected(false) {
-  if(auto mgr = _manager.lock()) {
-    if(!mgr->IsRaw()) {
-      _msg_builder.reset(new MessageBuilder());
-    }
-  }
 }
 
 void Client::Update(int socket, const std::string& ip) {
@@ -120,17 +121,17 @@ bool Client::Send(std::shared_ptr<Message> msg) {
     DLOG(error, "Client::Send - client is not connected");
     return false;
   }
-  msg = msg->ConvertToBaseMessage();
-  if(!msg) {
-    DLOG(error, "Client::Send - message is not valid");
-    return false;
-  }
+
   _connection->SendMsg(SharedPtr(), msg);
   return true;
 }
 
 std::shared_ptr<Client> Client::SharedPtr() {
   return std::static_pointer_cast<Client>(shared_from_this());
+}
+
+bool Client::IsConnected() {
+  return _is_connected;
 }
 
 bool Client::OnConnecting(NetError err) {
@@ -152,27 +153,31 @@ void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
     manager->OnMsgSent(SharedPtr(), msg, status);
 }
 
-void Client::OnDataRead(Data& data) {
+void Client::OnDataRead(std::shared_ptr<Data> data) {
+  std::shared_ptr<ClientManager> manager = _manager.lock();
+  if(!manager) {
+    return;
+  }
+
   if(_msg_builder) {
     std::vector<std::shared_ptr<Message> > msgs;
-    _msg_builder->AddData(data, msgs);
+    if(!_msg_builder->AddData(data, msgs)) {
+      manager->OnMsgBuilderError(SharedPtr());
+      return;
+    }
     if(msgs.size()) {
-      if(auto manager = _manager.lock()) {
-        for(auto msg : msgs) {
-          manager->OnClientRead(SharedPtr(), msg);
-        }
+      for(auto msg : msgs) {
+        manager->OnClientRead(SharedPtr(), msg);
       }
     }
   } else {
-    auto msg = std::make_shared<Message>(data._size, data._data);
-    if(auto manager = _manager.lock()) {
-      manager->OnClientRead(SharedPtr(), msg);
-    }
+    manager->OnClientRead(SharedPtr(), std::make_shared<Message>(data));
   }
 }
 
 void Client::OnConnectionClosed() {
   SocketObject::OnConnectionClosed();
-  if(auto manager = _manager.lock())
+  if(auto manager = _manager.lock()) {
     manager->OnClientClosed(SharedPtr());
+  }
 }

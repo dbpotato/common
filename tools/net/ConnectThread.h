@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2021 Adam Kaniewski
+Copyright (c) 2020 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,18 +24,22 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "Utils.h"
-#include "Collector.h"
 
+#include <map>
 #include <memory>
+
 
 class Client;
 class ThreadLoop;
+class Epool;
+
 
 class ConnectThread : public std::enable_shared_from_this<ConnectThread> {
 
 public:
   static std::shared_ptr<ConnectThread> GetInstance();
   void AddClient(std::shared_ptr<Client> client);
+  void Continue(std::shared_ptr<Client> client);
 
 private:
   ConnectThread();
@@ -43,6 +47,7 @@ private:
   void OnConnectComplete(std::shared_ptr<Client>, NetError err);
 
   static std::weak_ptr<ConnectThread> _instance;
-  Collector<std::shared_ptr<Client>> _clients;
+  std::map<uint32_t, std::shared_ptr<Client>> _clients;
   std::shared_ptr<ThreadLoop> _thread_loop;
+  std::shared_ptr<Epool> _epool;
 };

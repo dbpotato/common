@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -80,10 +80,34 @@ namespace StringUtils {
     return elements;
   };
 
-  static bool ToInt(const std::string &str, int& out_value){
+  static bool ToInt(const std::string &str, int& out_value, int base = 10){
     try {
-      out_value = std::stoi(str);
+      out_value = std::stoi(str, nullptr, base);
     } catch (const std::invalid_argument& exc) {
+      return false;
+    } catch (const std::out_of_range & exc) {
+      return false;
+    }
+    return true;
+  }
+
+  static bool ToInt(const std::string &str, long& out_value, int base = 10){
+    try {
+      out_value = std::stol(str, nullptr, base);
+    } catch (const std::invalid_argument& exc) {
+      return false;
+    } catch (const std::out_of_range & exc) {
+      return false;
+    }
+    return true;
+  }
+
+  static bool ToInt(const std::string &str, long long &out_value, int base = 10){
+    try {
+      out_value = std::stoll(str, nullptr, base);
+    } catch (const std::invalid_argument& exc) {
+      return false;
+    } catch (const std::out_of_range & exc) {
       return false;
     }
     return true;

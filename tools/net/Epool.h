@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 Adam Kaniewski
+Copyright (c) 2020 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,48 +23,46 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "PosixThread.h"
-
+#include <map>
 #include <memory>
 #include <vector>
-#include <condition_variable>
 
 class SocketObject;
+class ThreadLoop;
 
-
-class SocketEventListener {
-public :
-  class Event {
-  public:
-    Event(uint32_t flags);
-    bool CanRead();
-    bool CanWrite();
-    bool Closed();
-  private:
-    uint32_t _flags;
-  };
-
-  virtual void OnSocketEvents(std::vector<std::pair<int, Event>>& events) = 0;
+class SocketInfo {
+public:
+  SocketInfo(std::weak_ptr<SocketObject> object);
+  std::shared_ptr<SocketObject> lock();
+  std::weak_ptr<SocketObject> _object;
+  int _event_flags;
 };
 
-class Epool : public std::enable_shared_from_this<Epool>
-            , public ThreadObject {
+
+class Epool : public std::enable_shared_from_this<Epool> {
 public:
-  Epool();
-  bool Init(std::weak_ptr<SocketEventListener> listener);
-  void OnThreadStarted(int thread_id) override;
-
-  bool AddSocket(int socket_fd);
+  static std::shared_ptr<Epool> GetInstance();
+  ~Epool();
+  bool Init();
+  void AddSocket(std::shared_ptr<SocketObject> obj);
   void RemoveSocket(int socket_fd);
-  void SetFlags(int socket_fd, bool can_read, bool can_write);
-  //bool SameThread();
-  void NotifyEventsHandled();
+  void SetObservedEvent(int socket_fd, int event_flag, bool enabled);
 
+  void SetSocketAwaitingFlags(std::shared_ptr<SocketObject> obj, bool waiting_for_read, bool waiting_for_write);
+  void SetSocketAwaitingWrite(std::shared_ptr<SocketObject> obj, bool waiting_for_write);
+  void SetSocketAwaitingRead(std::shared_ptr<SocketObject> obj, bool waiting_for_read);
+
+protected:
+  Epool();
+  static std::weak_ptr<Epool> _instance;
 private:
+  bool CreateWakeFd();
+  void Wake();
+  void ClearWake();
+  void WaitForEvents();
+  void HandleSocketEvent(int socket_fd, int event);
   int _epool_fd;
-  bool _events_handed;
-  PosixThread _run_thread;
-  std::condition_variable _condition;
-  std::mutex _condition_mutex;
-  std::weak_ptr<SocketEventListener> _listener;
+  int _wake_up_fd;
+  std::map<int, SocketInfo> _sockets;
+  std::shared_ptr<ThreadLoop> _thread_loop;
 };

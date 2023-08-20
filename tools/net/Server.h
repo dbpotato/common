@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -40,7 +40,6 @@ class Server : public ClientManager,
 
 friend  std::shared_ptr<Server> Connection::CreateServer(int,
                                                          std::vector<std::weak_ptr<ClientManager>>&,
-                                                         bool,
                                                          std::shared_ptr<SocketContext>);
 
 public:
@@ -55,7 +54,6 @@ public:
   virtual void OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Message> msg, bool success) override;
   virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
   virtual void OnClientConnected(std::shared_ptr<Client> client) override;
-  bool IsRaw() override;
 
 protected:
   void AddClient(std::shared_ptr<Client> client);
@@ -66,13 +64,11 @@ protected:
   std::map<uint32_t, std::shared_ptr<Client> > _clients;
   std::vector<std::weak_ptr<ClientManager> > _listeners;
   std::mutex _mutex;
-  bool _is_raw;
 
 private :
-  Server(int raw_handle,
+  Server(int socket_fd,
          std::shared_ptr<Connection> connection,
          std::shared_ptr<SocketContext> context,
-         std::vector<std::weak_ptr<ClientManager> >& listeners,
-         bool is_raw);
+         std::vector<std::weak_ptr<ClientManager> >& listeners);
   void Init();
 };

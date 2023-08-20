@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,25 +23,36 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Connection.h"
-
+#include <cstring>
+#include <cstdint>
 #include <memory>
-#include <vector>
+#include <string>
 
-class Message;
-
-class MessageBuilder {
+class Data {
 public:
-  MessageBuilder();
-  void AddData(Data data, std::vector<std::shared_ptr<Message> >& out_msgs);
+  Data();
+  Data(const std::string& str);
+  Data(uint32_t size, std::shared_ptr<unsigned char> data);
+  Data(uint32_t size, const unsigned char* data);
+  Data(uint32_t size);
+  void Swap(std::shared_ptr<Data> data);
+  static std::shared_ptr<Data> MakeShallowCopy(std::shared_ptr<Data> data);
+
+  void Add(Data other_data);
+  void Add(std::shared_ptr<Data> other_data);
+  uint32_t GetTotalSize();
+  uint32_t GetCurrentSize();
+  uint32_t GetOffset();
+  bool AddOffset(uint32_t offset);
+  bool SetOffset(uint32_t offset);
+  bool SetCurrentSize(uint32_t size);
+  const std::shared_ptr<unsigned char> GetData();
+  unsigned char* GetCurrentDataRaw();
+  bool CopyTo(void* dest, uint32_t offset, uint32_t dest_size);
+  std::string ToString();
+
 protected:
-  uint32_t _expected_data_size;
-  uint32_t _data_size;
-  uint32_t _data_size_cap;
-  uint8_t _type;
+  uint32_t _size;
+  uint32_t _offset;
   std::shared_ptr<unsigned char> _data;
-  void MaybeResize(size_t add_size);
-  virtual void Check(std::vector<std::shared_ptr<Message> >& out_msgs);
-  virtual void MaybeGetHeaderData();
-  virtual std::shared_ptr<Message> CreateMessage();
 };

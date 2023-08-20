@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 -2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,21 +23,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Utils.h"
+#include <memory>
 
-#include <vector>
-
-
-class Client;
-class WebsocketMessage;
+class DataResource;
 
 class WebsocketFragmentBuilder {
 public :
-  WebsocketFragmentBuilder();
-  bool AddFragment(std::shared_ptr<WebsocketMessage> fragment);
-  std::shared_ptr<WebsocketMessage> MergeFragments();
+  WebsocketFragmentBuilder(uint8_t op_code, std::shared_ptr<DataResource> fragment);
+  bool AddFragment(std::shared_ptr<DataResource> fragment);
+  std::shared_ptr<DataResource> GetResource();
+  uint8_t GetOpcode();
 private :
-  uint8_t _original_opcode;
-  uint32_t _collected_size;
-  std::vector<Data> _collected_fragments;
+  uint8_t _opcode;
+  std::shared_ptr<DataResource> _resource;
 };

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -28,6 +28,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <unistd.h>
+
+#include "Data.h"
 
 
 namespace FileUtils {
@@ -69,15 +72,65 @@ namespace FileUtils {
   }
 
   static bool SaveFile(const std::string& file_path,
-                       std::shared_ptr<unsigned char> data,
+                       unsigned char* data,
                        size_t data_size) {
     bool result = true;
     std::ofstream stream(file_path, std::ios::out | std::ios::binary);
     if(!stream.is_open()) {
       return false;
     }
-    result = stream.write((char*)data.get(), data_size).good();
+    result = stream.write((char*)data, data_size).good();
     stream.close();
     return result;
+  }
+
+  static bool SaveFile(const std::string& file_path,
+                       std::shared_ptr<unsigned char> data,
+                       size_t data_size) {
+    return SaveFile(file_path, data.get(), data_size);
+  }
+
+  static bool SaveFile(const std::string& file_path,
+                      std::shared_ptr<Data> data) {
+    return SaveFile(file_path, data->GetCurrentDataRaw(), data->GetCurrentSize());
+  }
+
+  static bool DeleteFile(const std::string& file_path) {
+    return !unlink(file_path.c_str());
+  }
+
+  static bool CopyFile(const std::string& from, const std::string& to) {
+    std::ifstream in(from, std::ios::in | std::ios::binary);
+    if(!in.is_open()) {
+      return false;
+    }
+    std::ofstream out(to, std::ios::out | std::ios::binary);
+    if(!out.is_open()) {
+      return false;
+    }
+    out << in.rdbuf();
+    return true;
+  }
+
+  static bool MoveFile(const std::string& from, const std::string& to) {
+    if(!CopyFile(from, to)) {
+      return false;
+    }
+    return DeleteFile(from);
+  }
+
+  static std::string CreateTempFileName(const std::string& path) {
+    Data str_data(path + "/dbp_common_XXXXXX");
+    std::string file_name;
+    int fd = mkstemp((char*)str_data.GetCurrentDataRaw());
+    if(fd > 0) {
+      file_name = str_data.ToString();
+      close(fd);
+    }
+    return file_name;
+  }
+
+  static std::string CreateTempFileName() {
+    return CreateTempFileName("/tmp");
   }
 };

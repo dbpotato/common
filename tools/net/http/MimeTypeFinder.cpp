@@ -1,5 +1,5 @@
  /*
-Copyright (c) 2021 Adam Kaniewski
+Copyright (c) 2021 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -109,7 +109,9 @@ const std::map<const std::string, const std::string> MIME_TYPE_MAP = {
 };
 
 const std::string& MimeTypeFinder::Find(const std::string& resource) {
-  std::vector<std::string> split = StringUtils::Split(resource, ".");
+  std::vector<std::string> split = StringUtils::Split(resource, "?");
+  std::string no_args = split[0];
+  split = StringUtils::Split(no_args, ".");
 
   if(!split.size()) {
     return DEFUALT_MIME_TYPE;

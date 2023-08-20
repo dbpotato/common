@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -37,6 +37,7 @@ set(CXX_FLAGS
 )
 
 #add_definitions(-DENABLE_DEBUG_LOGGER)
+set(ENABLE_SSL false)
 
 set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
 set(CMAKE_SYSTEM_NAME linux)
@@ -45,6 +46,10 @@ set(DEFAULT_CXX "g++")
 set(COMMON_DIR "${PROJECT_SOURCE_DIR}/../../.")
 set(SRC_DIR "${PROJECT_SOURCE_DIR}")
 
+#[[
+When using ssl provide correct path to mbedtls directory
+]]
+set(MBEDTLS_DIR "")
 
 if(DEFINED ENV{CXX})
   message("Using user's compiler : " $ENV{CXX})
@@ -57,9 +62,10 @@ endif(DEFINED ENV{CXX})
 
 set(LIBS
   pthread
-  dl)
+  dl
+)
 
-include_directories(
+set(INCLUDE_DIR
   ${COMMON_DIR}/third_party/spdlog/include
   ${COMMON_DIR}/tools/thread
   ${COMMON_DIR}/tools/logger
@@ -71,21 +77,42 @@ include_directories(
 set(COMMON
   ${COMMON_DIR}/tools/thread/PosixThread.cpp
   ${COMMON_DIR}/tools/thread/ThreadLoop.cpp
+  ${COMMON_DIR}/tools/utils/Data.cpp
+  ${COMMON_DIR}/tools/utils/DataResource.cpp
+  ${COMMON_DIR}/tools/utils/TapeCutter.cpp
   ${COMMON_DIR}/tools/net/SocketContext.cpp
   ${COMMON_DIR}/tools/net/SocketObject.cpp
   ${COMMON_DIR}/tools/net/Client.cpp
   ${COMMON_DIR}/tools/net/Connection.cpp
-  ${COMMON_DIR}/tools/net/Transporter.cpp
   ${COMMON_DIR}/tools/net/ConnectThread.cpp
   ${COMMON_DIR}/tools/net/Epool.cpp
   ${COMMON_DIR}/tools/net/Message.cpp
-  ${COMMON_DIR}/tools/net/MessageBuilder.cpp
   ${COMMON_DIR}/tools/net/Server.cpp
   ${COMMON_DIR}/tools/net/http/HttpHeader.cpp
   ${COMMON_DIR}/tools/net/http/HttpMessage.cpp
+  ${COMMON_DIR}/tools/net/http/HttpDataCutter.cpp
+  ${COMMON_DIR}/tools/net/http/HttpDataParser.cpp
   ${COMMON_DIR}/tools/net/http/HttpServer.cpp
-  ${COMMON_DIR}/tools/net/http/MessageBuilderHttp.cpp
+  ${COMMON_DIR}/tools/net/http/HttpMessageBuilder.cpp
   ${COMMON_DIR}/tools/net/http/MimeTypeFinder.cpp
+)
+
+if(ENABLE_SSL)
+  add_definitions(-DENABLE_SSL)
+  set(LIBS ${LIBS} mbedtls mbedcrypto mbedx509)
+  set(INCLUDE_DIR ${INCLUDE_DIR} ${MBEDTLS_DIR}/include)
+  set(COMMON
+    ${COMMON}
+    ${COMMON_DIR}/tools/net/ConnectionMTls.cpp
+    ${COMMON_DIR}/tools/net/MtlsCppWrapper.cpp
+  )
+  link_directories(
+    ${MBEDTLS_DIR}/lib
+  )
+endif(ENABLE_SSL)
+
+include_directories(
+  ${INCLUDE_DIR}
 )
 
 set(SERVER

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018-2022 Adam Kaniewski
+Copyright (c) 2018-2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -36,14 +36,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ConnectionChecker::ConnectionChecker(std::shared_ptr<Connection> connection,
                                      size_t check_interval_in_sec,
                                      const std::string& server_url,
-                                     int server_port,
-                                     bool is_raw)
+                                     int server_port)
   : _connection(connection)
   , _check_interval_in_sec(check_interval_in_sec)
   , _server_url(server_url)
   , _server_port(server_port)
-  , _state(NOT_CONNECTED)
-  , _is_raw(is_raw){
+  , _state(NOT_CONNECTED) {
 }
 
 ConnectionChecker::~ConnectionChecker() {
@@ -52,7 +50,6 @@ ConnectionChecker::~ConnectionChecker() {
 }
 
 void ConnectionChecker::Init() {
-  DLOG(info, "ConnectionChecker::Init()");
   _alive_check.Run(shared_from_this());
 }
 
@@ -60,15 +57,12 @@ void ConnectionChecker::SetState(ConnectionState new_state) {
   if(_state != new_state) {
     switch (new_state) {
       case ConnectionState::NOT_CONNECTED:
-        DLOG(info, "ConnectStatus: NOT_CONNECTED");
         break;
       case ConnectionState::CONNECTED:
         if(_state == NOT_CONNECTED)
-          DLOG(info, "ConnectStatus: CONNECTED");
         break;
       case ConnectionState::MAYBE_CONNECTED:
         SendPing();
-        DLOG(info, "ConnectStatus: MAYBE_CONNECTED");
         break;
       default:
         break;
@@ -103,7 +97,6 @@ bool ConnectionChecker::OnClientConnecting(std::shared_ptr<Client> client, NetEr
 }
 
 void ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client) {
-  DLOG(info, "ConnectionChecker::OnClientConnected()");
   _current_client = client;
   SetState(ConnectionState::CONNECTED);
 }
@@ -113,17 +106,12 @@ void ConnectionChecker::OnClientClosed(std::shared_ptr<Client> client) {
   SetState(ConnectionState::NOT_CONNECTED);
 }
 
-bool ConnectionChecker::IsRaw() {
-  return _is_raw;
-}
-
 void ConnectionChecker::TryConnect() {
   if(_current_client) {
     _current_client.reset();
     SetState(ConnectionState::NOT_CONNECTED);
   }
 
-  DLOG(info, "ConnectionChecker::TryConnect(): Create Client");
   _connection->CreateClient(_server_port,
                             _server_url,
                             shared_from_this());

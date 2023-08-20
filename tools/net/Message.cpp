@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2022 Adam Kaniewski
+Copyright (c) 2018 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,120 +22,97 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Message.h"
+#include "Data.h"
+#include "DataResource.h"
 
 #include <string>
 #include <cstring>
 #include <unistd.h>
 
-
 MessageWriteRequest::MessageWriteRequest(std::shared_ptr<Message> msg)
     : _msg(msg)
-    , _write_offset(0) {
+    , _write_offset(0)
+    , _total_write(0) {
 }
 
-
-Message::Message(uint32_t size, const void* data)
-  : _type(0)
-  , _size(size)
-  , _is_raw(true) {
-  if(_size) {
-    _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
-    std::memcpy(_data.get(), data, _size);
-  }
+Message::Message() {
 }
 
-Message::Message(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t offset, bool copy)
-  : _type(0)
-  , _size(size)
-  , _data(data)
-  , _is_raw(true) {
-  if(copy || offset) {
-    _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
-    std::memcpy(_data.get(), data.get() + offset, _size);
-  }
+Message::Message(const std::string& str) {
+  _data = std::make_shared<Data>(str);
+};
+
+Message::Message(std::shared_ptr<Data> data) : _data(data) {
+};
+
+std::shared_ptr<Data> Message::GetData() {
+  return _data;
 }
 
-Message::Message(const std::string& str)
-  : _type(0)
-  , _size(str.length())
-  , _is_raw(true) {
-  if(_size) {
-    _data = std::shared_ptr<unsigned char>(new unsigned char[_size], std::default_delete<unsigned char[]>());
-    std::memcpy(_data.get(), str.c_str(), _size);
-  }
-}
-
-Message::Message(uint8_t type)
-  : _type(type)
-  , _size(0)
-  , _is_raw(false) {
-}
-
-Message::Message(uint8_t type, uint32_t size, const void* data)
-    : Message(size, data) {
-  _type = type;
-  _is_raw = false;
-}
-
-Message::Message(uint8_t type, uint32_t size, std::shared_ptr<unsigned char> data, uint32_t offset, bool copy)
-    : Message(size, data, offset, copy) {
-  _type = type;
-  _is_raw = false;
-}
-
-Message::Message(uint8_t type, const std::string& str)
-    : Message(str) {
-  _type = type;
-  _is_raw = false;
-}
-
-std::shared_ptr<Message> Message::ConvertToBaseMessage() {
-  return shared_from_this();
-}
-
-std::string Message::ToString(uint32_t offset) {
-  std::string result;
-  if(_size) {
-      result = std::string((const char*)_data.get() + offset, _size - offset);
+std::shared_ptr<Data> Message::GetDataSubset(size_t max_size, size_t offset) {
+  std::shared_ptr<Data> result;
+  if(_data->GetCurrentSize() && (_data->GetCurrentSize() > (uint32_t)offset)) {
+    result = Data::MakeShallowCopy(_data);
+    result->AddOffset(offset);
+    if(result->GetCurrentSize() > max_size) {
+      result->SetCurrentSize(max_size);
+    }
   }
   return result;
 }
 
-bool Message::CopyData(void* dest, uint32_t size, uint32_t offset) {
-  if(_size < size + offset)
-      return false;
+std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr<Data> header,
+                                                std::shared_ptr<DataResource> resource,
+                                                size_t max_size,
+                                                size_t offset) {
+  std::shared_ptr<Data> result = std::make_shared<Data>();
+  size_t header_data_size = 0;
 
-  std::memcpy(dest, _data.get() + offset, size);
-  return true;
-}
-
-ssize_t Message::WriteInto(int file_desc, ssize_t offset) {
-
-  if(offset >= _size)
-    return -1;
-
-  ssize_t result = 0;
-
-  if(!offset && !_is_raw) {
-    uint8_t header[MESSAGE_HEADER_LENGTH];
-    std::memcpy(header, &_type, sizeof(_type));
-    std::memcpy(header + sizeof(_type), &_size, sizeof(_size));
-
-    result = write(file_desc, (unsigned char*)header, MESSAGE_HEADER_LENGTH);
-    if(result != MESSAGE_HEADER_LENGTH) {
-      return -1;
+  if((uint32_t)offset < header->GetCurrentSize()) {
+    auto buff = std::shared_ptr<unsigned char>(new unsigned char[max_size],
+                                              std::default_delete<unsigned char[]>());
+    result = std::make_shared<Data>((uint32_t)max_size, buff);
+    header_data_size = header->GetCurrentSize() - offset;
+    if(header_data_size > max_size) {
+      header_data_size = max_size;
     }
+    std::memcpy(buff.get(), header->GetCurrentDataRaw(), header_data_size);
   }
 
-  if(_size) {
-    result = write(file_desc, _data.get() + offset, _size - offset);
-    if (result == -1) {
-      return -1;
-    }
-    else if(result != _size - offset) {
-      return offset + result;
-    }
+  if(header_data_size == max_size) {
+    return result;
   }
 
-  return 0;
+  if(!resource || !resource->GetSize()) {
+    result->SetCurrentSize(header_data_size);
+    return result;
+  }
+
+  max_size -= header_data_size;
+
+  size_t resource_offset = 0;
+  if(offset > header->GetCurrentSize()) {
+    resource_offset = offset - header->GetCurrentSize();
+  }
+
+  size_t resource_cpy_size = resource->GetSize() - resource_offset;
+  if(resource_cpy_size > max_size) {
+    resource_cpy_size = max_size;
+  }
+
+  if(!resource->UseDriveCache() && !header_data_size) {
+    result = Data::MakeShallowCopy(resource->GetMemCache());
+    result->SetOffset(resource_offset);
+    result->SetCurrentSize(resource_cpy_size);
+  } else {
+    if(!header_data_size) {
+      auto buff = std::shared_ptr<unsigned char>(new unsigned char[resource_cpy_size], std::default_delete<unsigned char[]>());
+      result = std::make_shared<Data>((uint32_t)resource_cpy_size, buff);
+    } else {
+      result->SetCurrentSize(header_data_size + resource_cpy_size);
+    }
+    resource->CopyToBuff(result->GetCurrentDataRaw() + header_data_size, resource_cpy_size, resource_offset);
+  }
+
+  return result;
 }

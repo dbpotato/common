@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -35,12 +35,24 @@ public :
   HttpHeader(HttpHeaderProtocol::Type protocol, int status_code);
   HttpHeader(HttpHeaderProtocol::Type protocol, HttpHeaderMethod::Type method, const std::string& request);
   static std::shared_ptr<HttpHeader> Parse(const std::string& header_str);
-  void SetField(HttpHeaderField::Type, const std::string& value);
-  void SetField(const std::string& key, const std::string& value);
+  void SetField(HttpHeaderField::Type type, const std::string& value);
+  void SetField(const std::string& type, const std::string& value);
+  void RemoveField(HttpHeaderField::Type type);
+  void RemoveField(const std::string& type);
   bool HasField(HttpHeaderField::Type type);
   bool GetFieldValue(HttpHeaderField::Type type, std::string& out_value);
   const std::map<std::string, std::string>& GetUnknownFields();
   bool IsValid();
+  bool WasReceived();
+  void SetReceived();
+  bool IsMessageCompleted();
+  void SetMessageCompleted();
+  void AddLoadedDataSize(uint32_t data_size);
+  void SetLoadedDataSize(uint32_t data_size);
+  uint32_t GetLoadedDataSize();
+  void SetExpectedDataSize(uint32_t data_size);
+  uint32_t GetExpectedDataSize();
+
   std::string ToString();
 
   HttpHeaderProtocol::Type GetProtocol(){return _protocol;}
@@ -53,6 +65,10 @@ protected :
   HttpHeaderMethod::Type _method;
   int _status_code;
   std::string _request_target;
+  bool _was_received;
+  bool _is_message_completed;
+  uint32_t _loaded_data_size;
+  uint32_t _expected_data_size;
   std::map<HttpHeaderField::Type, std::string> _fields;
   std::map<std::string, std::string> _unknown_fields;
   HttpHeader();

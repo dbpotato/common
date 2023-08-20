@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,15 +26,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdint>
 #include <memory>
 
+#include "Data.h"
+
 
 class WebsocketHeader {
 public :
-  WebsocketHeader();
-  static std::shared_ptr<WebsocketHeader> MaybeCreateFromRawData(uint32_t data_size, std::shared_ptr<unsigned char> data);
-  void ParseFirstBytes(uint8_t header_start, uint8_t mask_with_payload);
-  bool FindPayloadAndHeaderSize(uint32_t data_size, std::shared_ptr<unsigned char> data);
-  void FindMaskKey(std::shared_ptr<unsigned char> data);
-
   enum OpCode {
     CONTINUE = 0,
     TEXT = 1,
@@ -43,6 +39,19 @@ public :
     PING = 9,
     PONG = 10
   };
+
+  WebsocketHeader();
+  WebsocketHeader(OpCode code, uint32_t data_length = 0);
+
+  static std::shared_ptr<WebsocketHeader> MaybeCreateFromRawData(std::shared_ptr<Data> data);
+  void ParseFirstBytes(uint8_t header_start, uint8_t mask_with_payload);
+  bool FindPayloadAndHeaderSize(std::shared_ptr<Data> data);
+  void FindMaskKey(std::shared_ptr<Data> data);
+  bool HasControlOpCode();
+  bool HasFinFlag();
+  void CreateBinaryForm();
+  std::shared_ptr<Data> GetBinaryForm();
+
 
   uint8_t _fin : 1;
   uint8_t _rsv1 : 1;
@@ -55,4 +64,5 @@ public :
   uint8_t _mask_key[4];
 
   uint32_t _header_length;
+  std::shared_ptr<Data> _binary_form;
 };

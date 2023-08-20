@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,14 +24,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Server.h"
 
 
-Server::Server(int raw_handle,
+Server::Server(int socket_fd,
                std::shared_ptr<Connection> connection,
                std::shared_ptr<SocketContext> context,
-               std::vector<std::weak_ptr<ClientManager> >& listeners,
-               bool is_raw)
-    : SocketObject(raw_handle, true, connection, context)
-    ,_listeners(listeners)
-    ,_is_raw(is_raw) {
+               std::vector<std::weak_ptr<ClientManager> >& listeners)
+    : SocketObject(socket_fd, true, connection, context)
+    ,_listeners(listeners) {
 }
 
 void Server::Init() {
@@ -82,10 +80,6 @@ void Server::OnClientConnected(std::shared_ptr<Client> client) {
       listener->OnClientConnected(client);
     }
   }
-}
-
-bool Server::IsRaw() {
-  return _is_raw;
 }
 
 void Server::AddClient(std::shared_ptr<Client> client) {

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2022 Adam Kaniewski
+Copyright (c) 2019 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,7 +23,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <cstring>
 #include <memory>
 
 static const double CONNECT_TIMEOUT_IN_MS = 300.0;
@@ -32,25 +31,11 @@ static const int DEFAULT_SOCKET = -1;
 enum NetError {
   OK = 0,
   RETRY,
+  NEEDS_READ,
+  NEEDS_WRITE,
   TIMEOUT,
-  FAILED
-};
-
-class Data {
-public:
-  uint32_t _size;
-  std::shared_ptr<unsigned char> _data;
-  Data() : _size(0) {}
-  Data(uint32_t size, std::shared_ptr<unsigned char> data)
-      : _size(size)
-      , _data(data) {
-  }
-  Data(uint32_t size, const unsigned char* data)
-      : _size(size) {
-    _data = std::shared_ptr<unsigned char>(new unsigned char[_size],
-                                           std::default_delete<unsigned char[]>());
-    std::memcpy(_data.get(), data, _size);
-  }
+  FAILED,
+  EPOOL_FAILED
 };
 
 template<class T>

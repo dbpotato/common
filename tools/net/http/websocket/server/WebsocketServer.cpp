@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -21,6 +21,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+#include "DataResource.h"
 #include "HttpHeaderDecl.h"
 #include "HttpHeader.h"
 #include "HttpMessage.h"
@@ -28,6 +29,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Message.h"
 #include "Server.h"
 #include "StringUtils.h"
+#include "WebsocketDataCutter.h"
+#include "WebsocketFragmentBuilder.h"
 #include "WebsocketMessageBuilder.h"
 #include "WebsocketMessage.h"
 #include "WebsocketServer.h"
@@ -57,7 +60,7 @@ void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::s
   }
 
   std::shared_ptr<WebsocketMessage> websocket_msg = std::static_pointer_cast<WebsocketMessage>(msg);
-  auto header = websocket_msg->_header;
+  auto header = websocket_msg->GetHeader();
 
   switch (header->_opcode) {
     case WebsocketHeader::TEXT:
@@ -80,11 +83,6 @@ void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::s
 }
 
 void WebsocketClientManager::OnClientClosed(std::shared_ptr<Client> client) {
-
-}
-
-bool WebsocketClientManager::IsRaw() {
-  return true;
 }
 
 WebsocketServer::WebsocketServer()
@@ -102,7 +100,6 @@ bool WebsocketServer::Init(std::shared_ptr<Connection> connection,
 }
 
 void WebsocketServer::ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg) {
-
   if(CheckForProtocolUpgradeRequest(client, msg->GetHeader())) {
     return;
   }
@@ -150,9 +147,9 @@ std::string WebsocketServer::PrepareWebSocketAccept(const std::string& key) {
 
 void WebsocketServer::SendHandshakeResponse(std::shared_ptr<Client> client, const std::string& accept_hash) {
   HttpHeader header(HttpHeaderProtocol::HTTP_1_1, 101);
-  header.AddField(HttpHeaderField::UPGRADE, "websocket");
-  header.AddField(HttpHeaderField::CONNECTION, "Upgrade");
-  header.AddField(HttpHeaderField::SEC_WEBSOCKET_ACCEPT, accept_hash);
+  header.SetField(HttpHeaderField::UPGRADE, "websocket");
+  header.SetField(HttpHeaderField::CONNECTION, "Upgrade");
+  header.SetField(HttpHeaderField::SEC_WEBSOCKET_ACCEPT, accept_hash);
 
   auto header_str = header.ToString();
 
@@ -165,7 +162,8 @@ void WebsocketServer::OnWsClose(std::shared_ptr<Client> client) {
 }
 
 void WebsocketServer::OnWsPing(std::shared_ptr<Client> client, std::shared_ptr<WebsocketMessage> msg) {
-  auto pong_msg = WebsocketMessage::CreatePongMessage(msg->_size, msg->_data);
+  auto response = msg->GetResource()->GetLastRecivedData(); //TODO
+  auto pong_msg = WebsocketMessage::CreatePongMessage(response);
   client->Send(pong_msg);
 }
 

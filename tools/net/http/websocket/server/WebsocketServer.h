@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -42,7 +42,6 @@ public:
   void OnClientConnected(std::shared_ptr<Client> client) override;
   void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
   void OnClientClosed(std::shared_ptr<Client> client) override;
-  bool IsRaw() override;
 private:
   std::weak_ptr<WebsocketServer> _owner;
 };

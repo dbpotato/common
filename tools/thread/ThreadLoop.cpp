@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2021 Adam Kaniewski
+Copyright (c) 2020 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -39,7 +39,6 @@ bool ThreadLoop::OnDifferentThread() {
 
 void ThreadLoop::OnThreadStarted(int thread_id) {
   while(_run_thread.ShouldRun()) {
-
     std::function<void()> msg;
     {
       std::unique_lock<std::mutex> lock(_condition_mutex);
@@ -48,9 +47,10 @@ void ThreadLoop::OnThreadStarted(int thread_id) {
       _msgs.pop();
     }
 
-    if(msg)
+    if(msg) {
       msg();
-    else
+    } else {
       return;
+    }
   }
 }

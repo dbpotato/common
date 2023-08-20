@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2022 Adam Kaniewski
+Copyright (c) 2018 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -47,8 +47,7 @@ public:
   ConnectionChecker(std::shared_ptr<Connection> connection,
                     size_t check_interval_in_sec,
                     const std::string& server_url,
-                    int server_port,
-                    bool is_raw);
+                    int server_port);
 
   ~ConnectionChecker();
   void Init();
@@ -58,8 +57,6 @@ public:
   virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
   virtual void OnClientConnected(std::shared_ptr<Client> client) override;
   virtual void OnClientClosed(std::shared_ptr<Client> client) override;
-  bool IsRaw() override;
-
   virtual std::shared_ptr<Message> CreatePingMessage() = 0;
 
 protected :
@@ -76,5 +73,4 @@ private :
   std::string _server_url;
   int _server_port;
   std::atomic<ConnectionState> _state;
-  bool _is_raw;
 };

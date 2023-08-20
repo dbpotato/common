@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 -2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,37 +26,33 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "HttpHeader.h"
 #include "Message.h"
 
+class Data;
+class DataResource;
 
 class HttpMessage : public Message {
 public :
+
   HttpMessage(int status_code,
               const std::string& body_text = {});
 
-  HttpMessage(int status_code,
-              uint32_t body_size,
-              const void* body_data);
 
   HttpMessage(HttpHeaderMethod::Type method,
               const std::string& request,
               const std::string& body_text = {});
 
-  HttpMessage(HttpHeaderMethod::Type method,
-              const std::string& request,
-              uint32_t body_size,
-              const void* body_data);
+  HttpMessage(std::shared_ptr<HttpHeader> header,
+              std::shared_ptr<DataResource> resource);
 
-  HttpMessage(uint32_t body_size,
-              std::shared_ptr<unsigned char> body_data,
-              uint32_t data_offset,
-              bool copy_data,
-              std::shared_ptr<HttpHeader> header);
 
-  std::shared_ptr<Message> ConvertToBaseMessage() override;
   std::shared_ptr<HttpHeader> GetHeader();
-  static std::shared_ptr<HttpMessage> FromFile(const std::string& file_path);
+  std::shared_ptr<DataResource> GetResource();
+  static std::shared_ptr<HttpMessage> CreateFromFile(const std::string& file_path);
+  std::shared_ptr<Data> GetDataSubset(size_t max_size, size_t offset) override;
 
 private :
   void CreateHeader(int status_code, uint32_t body_size);
   void CreateHeader(HttpHeaderMethod::Type method, const std::string& request, uint32_t body_size);
   std::shared_ptr<HttpHeader> _header;
+  std::shared_ptr<DataResource> _resource;
+  std::shared_ptr<Data> _header_str_data;
 };

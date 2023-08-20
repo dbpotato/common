@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 - 2022 Adam Kaniewski
+Copyright (c) 2021 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -66,7 +66,6 @@ public:
   virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
   virtual void OnClientConnected(std::shared_ptr<Client> client) override;
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
-  bool IsRaw() override;
 
 protected:
   virtual void ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg);

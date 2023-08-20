@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2022 Adam Kaniewski
+Copyright (c) 2020 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "HttpMessage.h"
 #include "HttpServer.h"
 #include "Message.h"
-#include "MessageBuilderHttp.h"
+#include "HttpMessageBuilder.h"
 #include "Logger.h"
 #include "Server.h"
 
@@ -53,7 +53,7 @@ bool HttpServer::Init(std::shared_ptr<HttpRequestHandler> request_handler,
 }
 
 bool HttpServer::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
-  auto msg_builder = std::unique_ptr<MessageBuilderHttp>(new MessageBuilderHttp());
+  auto msg_builder = std::unique_ptr<HttpMessageBuilder>(new HttpMessageBuilder());
   client->SetMsgBuilder(std::move(msg_builder));
   return true;
 }
@@ -64,10 +64,6 @@ void HttpServer::OnClientConnected(std::shared_ptr<Client> client) {
 void HttpServer::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
   std::shared_ptr<HttpMessage> http_msg = std::static_pointer_cast<HttpMessage>(msg);
   ProcessRequest(client, http_msg);
-}
-
-bool HttpServer::IsRaw() {
-  return true;
 }
 
 void HttpServer::ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg) {

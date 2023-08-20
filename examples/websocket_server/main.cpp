@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Connection.h"
+#include "DataResource.h"
 #include "WebsocketServer.h"
 #include "HttpMessage.h"
 #include "WebsocketMessage.h"
@@ -93,7 +94,7 @@ void HttpRequestHandlerImpl::Handle(HttpRequest& request) {
   if(!request_header->GetRequestTarget().compare("/")) {
     //redirect to index.html
     request._response_msg = std::make_shared<HttpMessage>(301);
-    request._response_msg->GetHeader()->AddField(HttpHeaderField::LOCATION, "/index.html");
+    request._response_msg->GetHeader()->SetField(HttpHeaderField::LOCATION, "/index.html");
     return;
   }
   if(!request_header->GetRequestTarget().compare("/index.html")) {
@@ -112,7 +113,8 @@ bool WebsocketClientListenerImpl::OnWsClientConnected(std::shared_ptr<Client> cl
 }
 
 void WebsocketClientListenerImpl::OnWsClientMessage(std::shared_ptr<Client> client, std::shared_ptr<WebsocketMessage> message) {
-  log()->info("WS Received from client : {} message : {}", client->GetId(), message->ToString());
+  auto data = message->GetResource()->GetMemCache();
+  log()->info("WS Received from client : {} message : {}", client->GetId(), data->ToString());
 
   auto response = std::make_shared<WebsocketMessage>("Hello client with id : " + std::to_string(client->GetId()));
   client->Send(response);

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 - 2022 Adam Kaniewski
+Copyright (c) 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,28 +23,26 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "HttpHeader.h"
-#include "MessageBuilder.h"
+#include "Data.h"
+#include <vector>
 
+class DataResource;
 
-class Message;
-
-class MessageBuilderHttp : public MessageBuilder{
+class TapeCutter {
 public:
-  MessageBuilderHttp();
+  TapeCutter();
+  virtual bool AddData(std::shared_ptr<Data> data);
+protected:
+  virtual bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) = 0;
+  virtual void FindCutFooter(std::shared_ptr<Data> data) = 0;
+  virtual uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) = 0;
+
+  std::shared_ptr<Data> _unfinished_header;
+  uint32_t _expected_cut_size;
+  uint32_t _current_cut_size;
+
 private:
-  enum BodyTransferMode {
-    UNKNOWN = 0,
-    CONTENT_LENGTH,
-    CHUNKED,
-    NONE
-  };
-  bool IsMessageCompleted();
-  void Check(std::vector<std::shared_ptr<Message> >& out_msgs) override;
-  void MaybeGetHeaderData() override;
-  std::shared_ptr<Message> CreateMessage() override;
-  int _content_length;
-  int _content_pos;
-  std::shared_ptr<HttpHeader> _header;
-  BodyTransferMode _mode;
+  void Reset();
+  void OnEndFound(std::shared_ptr<Data> data);
+  bool _header_found;
 };

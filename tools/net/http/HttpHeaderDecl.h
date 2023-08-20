@@ -75,7 +75,16 @@ namespace HttpHeaderMethod {
     PATCH,
     POST,
     PUT,
-    TRACE
+    TRACE,
+
+    //WebDAV
+    COPY,
+    LOCK,
+    MKCOL,
+    MOVE,
+    PROPFIND,
+    PROPPATCH,
+    UNLOCK
   };
 
   static const std::map<std::string, Type> lowercase_method_str_to_enum = {
@@ -87,7 +96,15 @@ namespace HttpHeaderMethod {
     {"patch", Type::PATCH},
     {"post", Type::POST},
     {"put", Type::PUT},
-    {"trace", Type::TRACE}
+    {"trace", Type::TRACE},
+
+    {"copy", Type::COPY},
+    {"lock", Type::LOCK},
+    {"mkcol", Type::MKCOL},
+    {"move", Type::MOVE},
+    {"propfind", Type::PROPFIND},
+    {"proppatch", Type::PROPPATCH},
+    {"unlock", Type::UNLOCK}
   };
 
   static const std::map<Type, std::string> enum_to_method_str = {
@@ -98,14 +115,24 @@ namespace HttpHeaderMethod {
     {Type::OPTIONS, "OPTIONS"},
     {Type::PATCH, "PATCH"},
     {Type::POST, "POST"},
+    {Type::PROPFIND, "PROPFIND"},
     {Type::PUT, "PUT"},
-    {Type::TRACE, "TRACE"}
+    {Type::TRACE, "TRACE"},
+
+    {Type::COPY, "COPY"},
+    {Type::LOCK, "LOCK"},
+    {Type::MKCOL, "MKCOL"},
+    {Type::MOVE, "MOVE"},
+    {Type::PROPFIND, "PROPFIND"},
+    {Type::PROPPATCH, "PROPPATCH"},
+    {Type::UNLOCK, "UNLOCK"}
   };
 
   static bool GetTypeFromString(std::string type_str, Type& type) {
     auto it = lowercase_method_str_to_enum.find(StringUtils::Lowercase(type_str));
-    if(it == lowercase_method_str_to_enum.end())
+    if(it == lowercase_method_str_to_enum.end()) {
       return false;
+    }
 
     type = it->second;
     return true;
@@ -129,6 +156,8 @@ namespace HttpHeaderStatus {
     {204, "No Content"},
     {205, "Reset Content"},
     {206, "Partial Content"},
+    {207, "Multi-Status"},
+    {208, "Already Reported"},
     {300, "Multiple Choices"},
     {301, "Moved Permanently"},
     {302, "Found"},

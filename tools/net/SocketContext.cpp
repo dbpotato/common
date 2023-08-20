@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2020 Adam Kaniewski
+Copyright (c) 2019 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Client.h"
 #include "Connection.h"
 #include "Logger.h"
+#include "Epool.h"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -43,9 +44,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SocketContext::SocketContext(SocketContext::State init_state)
     : _info(nullptr)
     , _info_next(nullptr)
-    , _socket_handle(DEFAULT_SOCKET)
+    , _socket_fd(DEFAULT_SOCKET)
     , _time_passed(0.0)
-    , _state(init_state) {
+    , _state(init_state)
+    , _awaits_read_write(false) {
 
   if(_state != GETTING_INFO &&
      _state != AFTER_ACCEPTING &&
@@ -65,11 +67,16 @@ SocketContext::SocketContext(SocketContext::State init_state)
 }
 
 SocketContext::~SocketContext() {
-  if(_info)
+  if(_info) {
     freeaddrinfo(_info);
+  }
 }
 
-NetError SocketContext::Continue(std::shared_ptr<Client> client) {
+NetError SocketContext::Continue(std::shared_ptr<Client> client, bool on_read_write_available) {
+  if(on_read_write_available) {
+    SetState(NextState());
+  }
+
   auto start = std::chrono::system_clock::now();
   switch (_state) {
     case GETTING_INFO:
@@ -114,10 +121,10 @@ void SocketContext::GetAddrInfo(std::shared_ptr<Client> client) {
 }
 
 void SocketContext::Connect(std::shared_ptr<Client> client) {
-  if(_socket_handle == DEFAULT_SOCKET) {
-    _socket_handle = socket(_info_next->ai_family, _info_next->ai_socktype, _info_next->ai_protocol);
-    if(_socket_handle != DEFAULT_SOCKET) {
-      fcntl(_socket_handle, F_SETFL, O_NONBLOCK);
+  if(_socket_fd == DEFAULT_SOCKET) {
+    _socket_fd = socket(_info_next->ai_family, _info_next->ai_socktype, _info_next->ai_protocol);
+    if(_socket_fd != DEFAULT_SOCKET) {
+      fcntl(_socket_fd, F_SETFL, O_NONBLOCK);
     }
     else {
       DLOG(error, "SocketContext: create socket failed");
@@ -126,15 +133,16 @@ void SocketContext::Connect(std::shared_ptr<Client> client) {
     }
   }
 
-  if (_socket_handle != DEFAULT_SOCKET) {
-    int res = connect(_socket_handle, _info_next->ai_addr, _info_next->ai_addrlen);
+  if (_socket_fd != DEFAULT_SOCKET) {
+    int res = connect(_socket_fd, _info_next->ai_addr, _info_next->ai_addrlen);
     if(!res) {
       char ipstr[INET_ADDRSTRLEN];
       struct sockaddr_in* ipv = reinterpret_cast<struct sockaddr_in*>(_info_next->ai_addr);
       struct in_addr* addr = &(ipv->sin_addr);
       inet_ntop(_info_next->ai_family, addr, ipstr, sizeof ipstr);
 
-      client->Update(_socket_handle, std::string(ipstr));
+      client->Update(_socket_fd, std::string(ipstr));
+      Epool::GetInstance()->AddSocket(client);
       SetState(NextState());
       return;
     }
@@ -147,15 +155,15 @@ void SocketContext::Connect(std::shared_ptr<Client> client) {
     _info_next = _info_next->ai_next;
   }
   else {
-    DLOG(warn, "SocketContext: connect fail : {}:{} : {}",
+    DLOG(warn, "SocketContext: connect fail : {} : {} : {}",
          client->GetUrl(),
          client->GetPort(),
          strerror(errno));
 
     SetState(FAILED);
-    if(_socket_handle != DEFAULT_SOCKET) {
-      close(_socket_handle);
-      _socket_handle = DEFAULT_SOCKET;
+    if(_socket_fd != DEFAULT_SOCKET) {
+      close(_socket_fd);
+      _socket_fd = DEFAULT_SOCKET;
     }
   }
 }
@@ -179,6 +187,12 @@ void SocketContext::ErrToState(NetError err) {
       break;
     case NetError::RETRY:
       break;
+    case NetError::NEEDS_READ:
+      SetState(AWAIT_READ);
+      break;
+    case NetError::NEEDS_WRITE:
+      SetState(AWAIT_WRITE);
+      break;
     case NetError::TIMEOUT:
       SetState(TIMEOUT);
       break;
@@ -198,6 +212,10 @@ NetError SocketContext::StateToError() {
       return NetError::FAILED;
     case FINISHED :
       return NetError::OK;
+    case AWAIT_READ:
+      return NetError::NEEDS_READ;
+    case AWAIT_WRITE:
+      return NetError::NEEDS_WRITE;
     default:
       return NetError::RETRY;
   }
@@ -212,6 +230,9 @@ SocketContext::State SocketContext::NextState() {
     case AFTER_CONNECTING:
     case AFTER_ACCEPTING:
       return FINISHED;
+    case AWAIT_READ:
+    case AWAIT_WRITE:
+      return _previous_state;
     default:
       return _state;
   }
@@ -229,5 +250,11 @@ void SocketContext::TimeoutCheck() {
 }
 
 void SocketContext::SetState(State state) {
+  _previous_state = _state;
   _state = state;
+}
+
+bool SocketContext::AwaitsConnectingReadWrite() {
+  return ((_state == AWAIT_READ) ||
+          (_state == AWAIT_WRITE));
 }

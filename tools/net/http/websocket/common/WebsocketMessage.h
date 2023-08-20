@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,22 +25,25 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Message.h"
 #include "WebsocketHeader.h"
+#include "Data.h"
 
+class DataResource;
 
 class WebsocketMessage : public Message {
 public :
-  WebsocketMessage();
-  WebsocketMessage(uint32_t size, const void* data);
-  WebsocketMessage(uint32_t size, std::shared_ptr<unsigned char> data, uint32_t offset = 0, bool copy = false);
   WebsocketMessage(const std::string& str);
+  WebsocketMessage(std::shared_ptr<WebsocketHeader> header, std::shared_ptr<DataResource> resource);
 
-  static std::shared_ptr<Message> CreatePingMessage();
-  static std::shared_ptr<Message> CreatePongMessage(uint32_t ping_data_size, std::shared_ptr<unsigned char> ping_data);
-  static std::shared_ptr<Message> CreateCloseMessage();
+  static std::shared_ptr<WebsocketMessage> CreatePingMessage();
+  static std::shared_ptr<WebsocketMessage> CreatePongMessage(std::shared_ptr<Data> ping_data);
+  static std::shared_ptr<WebsocketMessage> CreateCloseMessage();
 
-  bool _is_text_message;
-  std::shared_ptr<WebsocketHeader> _header;
-  std::shared_ptr<Message> ConvertToBaseMessage() override;
+  std::shared_ptr<Data> GetDataSubset(size_t max_size, size_t offset) override;
+  std::shared_ptr<WebsocketHeader> GetHeader();
+  std::shared_ptr<DataResource> GetResource();
+
 private :
-  static std::shared_ptr<Message> CreateBaseMessage(WebsocketHeader::OpCode op_code, uint32_t data_size, std::shared_ptr<unsigned char> data);
+  std::shared_ptr<WebsocketHeader> _header;
+  std::shared_ptr<DataResource> _resource;
+  std::shared_ptr<Data> _header_bin_data;
 };

@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 Adam Kaniewski
+Copyright (c) 2022 - 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,11 +26,20 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "HttpMessage.h"
 #include "HttpHeader.h"
 #include "Logger.h"
+#include "FileUtils.h"
 
+#ifdef ENABLE_SSL
 
-const static int SERVER_PORT = 8080;
+#include "ConnectionMTls.h"
+#include "MtlsCppWrapper.h"
+using namespace MtlsCppWrapper;
 
-const static std::string HTTP_RESPONSE_BODY = R"""(
+#endif //ENABLE_SSL
+
+const static int HTTP_SERVER_PORT = 80;
+const static int HTTPS_SERVER_PORT = 443;
+
+const static std::string DEFAULT_INDEX_HTML = R"""(
 <!DOCTYPE html>
 <html>
   <head>
@@ -39,6 +48,22 @@ const static std::string HTTP_RESPONSE_BODY = R"""(
   <body>Hello World</body>
 </html>
 )""";
+
+const static std::string SERVER_CERT_FILE="server.crt";
+const static std::string SERVER_KEY_FILE="server.key";
+
+#ifdef ENABLE_SSL
+const static bool USE_SSL = true;
+#else
+const static bool USE_SSL = false;
+#endif //ENABLE_SSL
+
+bool LoadCerts(std::string& out_key, std::string& out_cert) {
+  bool result = true;
+  result = result && FileUtils::ReadFile(SERVER_KEY_FILE, out_key);
+  result = result && FileUtils::ReadFile(SERVER_CERT_FILE, out_cert);
+  return result;
+}
 
 class HttpRequestHandlerImpl
     : public HttpRequestHandler {
@@ -57,37 +82,75 @@ void HttpRequestHandlerImpl::Handle(HttpRequest& request) {
   auto request_header = request._request_msg->GetHeader();
   if(request_header->GetMethod() != HttpHeaderMethod::GET) {
     //send "method not supported" response
+    log()->warn("Got request with method other than GET");
     request._response_msg = std::make_shared<HttpMessage>(405);
     return;
   }
-  if(!request_header->GetRequestTarget().compare("/")) {
+
+  auto target = request_header->GetRequestTarget();
+  log()->info("Got Request for : {}", target);
+
+  if(!target.compare("/")) {
     //redirect to index.html
     request._response_msg = std::make_shared<HttpMessage>(301);
     request._response_msg->GetHeader()->SetField(HttpHeaderField::LOCATION, "/index.html");
     return;
-  }
-  if(!request_header->GetRequestTarget().compare("/index.html")) {
-    //send http document
-    request._response_msg = std::make_shared<HttpMessage>(200, HTTP_RESPONSE_BODY);
   } else {
-    //send "page not found response"
-    request._response_msg = std::make_shared<HttpMessage>(404);
+    auto msg = HttpMessage::CreateFromFile("." + request_header->GetRequestTarget());
+    if(msg) {
+      request._response_msg = msg;
+    } else {
+      if(!target.compare("/index.html")) {
+        //send http document
+        request._response_msg = std::make_shared<HttpMessage>(200, DEFAULT_INDEX_HTML);
+      } else {
+        //send "page not found response"
+        request._response_msg = std::make_shared<HttpMessage>(404);
+      }
+    }
   }
 }
 
-int main() {
-  //creates base ( not encrypted ) TCP connection;
-  auto connection = Connection::CreateBasic();
-  auto server = std::make_shared<HttpServer>();
+int main(int argc, char** args) {
+  int listen_port = USE_SSL ? HTTPS_SERVER_PORT: HTTP_SERVER_PORT;
+  if(argc == 2) {
+    if(!StringUtils::ToInt(args[1], listen_port)) {
+      log()->error("Can't parse server port : {}", args[1]); 
+      return 1;
+    }
+  }
 
-  if(!server->Init(connection,
-                   std::make_shared<HttpRequestHandlerImpl>(),
-                   SERVER_PORT)) {
-    log()->error("Server failed to start at port : {}", SERVER_PORT);
+
+  std::shared_ptr<Connection> connection;
+  std::shared_ptr<Server> server;
+  std::shared_ptr<HttpServer> http_server = std::make_shared<HttpServer>();
+
+#ifdef ENABLE_SSL
+  std::string key, cert;
+  if(!LoadCerts(key, cert)) {
+    log()->error("Server failed to load cert files");
+    return 1;
+  }
+  auto mtls_config = MtlsCppConfig::CreateServerConfig(key, cert);
+  if(!mtls_config) {
+    log()->error("Failed to create ssl config");
+    return 1;
+  }
+
+  auto ssl_connection = ConnectionMTls::CreateMTls();
+  connection = ssl_connection;
+  server = ssl_connection->CreateServer(listen_port, http_server, mtls_config);
+#else
+  connection = Connection::CreateBasic();
+  server = connection->CreateServer(listen_port, http_server);
+#endif //ENABLE_SSL
+
+  if(!http_server->Init(std::make_shared<HttpRequestHandlerImpl>(), server)) {
+    log()->error("Server failed to start at port : {}", listen_port);
     return 0;
   }
 
-  log()->info("Server started at port : {}", SERVER_PORT);
+  log()->info("Server started at port : {}", listen_port);
 
   while(true)
     sleep(1);
