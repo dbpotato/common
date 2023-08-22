@@ -33,9 +33,6 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #ifdef ENABLE_SSL
 #include "ConnectionMTls.h"
-const static bool needs_ssl = true;
-#else
-const static bool needs_ssl = false;
 #endif //ENABLE_SSL
 
 

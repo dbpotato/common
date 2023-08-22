@@ -49,7 +49,7 @@ set(SRC_DIR "${PROJECT_SOURCE_DIR}")
 #[[
 When using ssl provide correct path to mbedtls directory
 ]]
-set(MBEDTLS_DIR "${PROJECT_SOURCE_DIR}/../../../tp_builder/mbedtls_x86_64/usr/local")
+set(MBEDTLS_DIR "")
 
 
 if(DEFINED ENV{CXX})
