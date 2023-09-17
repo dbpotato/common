@@ -34,7 +34,7 @@ Based on Mbed TLS 3.4.1
 #include "mbedtls/ssl_cache.h"
 #include "mbedtls/ssl.h"
 
-#include "Utils.h"
+#include "NetUtils.h"
 
 #include <memory>
 #include <string>

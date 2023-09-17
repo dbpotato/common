@@ -24,11 +24,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "Client.h"
+#include "NetUtils.h"
 #include "SocketObject.h"
-#include "Utils.h"
 
-#include <memory>
 #include <map>
+#include <memory>
 #include <vector>
 
 

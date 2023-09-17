@@ -37,25 +37,3 @@ enum NetError {
   FAILED,
   EPOOL_FAILED
 };
-
-template<class T>
-class LockablePtr {
-private:
-  std::weak_ptr<T> _weak;
-  std::shared_ptr<T> _shared;
-public:
-  LockablePtr(std::weak_ptr<T> ptr) : _weak(ptr){}
-
-  std::shared_ptr<T> Get() {
-    return _shared;
-  }
-
-  std::shared_ptr<T> Lock() {
-    _shared = _weak.lock();
-    return _shared;
-  }
-
-  void Unlock() {
-    _shared.reset();
-  }
-};

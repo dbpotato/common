@@ -52,13 +52,13 @@ When using ssl provide correct path to mbedtls directory
 set(MBEDTLS_DIR "")
 
 
-if(DEFINED ENV{CXX})
-  message("Using user's compiler : " $ENV{CXX})
-  set(CMAKE_CXX_COMPILER $ENV{CXX})
+if(DEFINED ENV{CUSTOM_CXX})
+  message("Using user's compiler : " $ENV{CUSTOM_CXX})
+  set(CMAKE_CXX_COMPILER $ENV{CUSTOM_CXX})
 else(DEFINED ENV{CXX})
   message("Using default compiler : " ${DEFAULT_CXX})
   set(CMAKE_CXX_COMPILER ${DEFAULT_CXX})
-endif(DEFINED ENV{CXX})
+endif(DEFINED ENV{CUSTOM_CXX})
 
 
 set(LIBS
@@ -72,6 +72,7 @@ set(INCLUDE_DIR
   ${COMMON_DIR}/tools/logger
   ${COMMON_DIR}/tools/utils
   ${COMMON_DIR}/tools/net
+  ${COMMON_DIR}/tools/net/utils
   ${COMMON_DIR}/tools/net/http
 )
 

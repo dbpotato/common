@@ -23,7 +23,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "SocketObject.h"
 #include "Connection.h"
-#include "Utils.h"
+#include "NetUtils.h"
+
 
 SocketObject::SocketObject(int socket_fd,
                            bool is_server_socket,

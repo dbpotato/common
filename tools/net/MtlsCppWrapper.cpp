@@ -272,12 +272,12 @@ bool MtlsCppSsl::Read(void* dest, int dest_size, size_t& out_read_size) {
   if((read_value == MBEDTLS_ERR_SSL_WANT_READ) || (read_value == MBEDTLS_ERR_SSL_WANT_WRITE)) {
     out_read_size = 0;
     return true;
-  } else if(read_value <= 0) {
+  } else if(read_value < 0) {
     DLOG(warn, "MtlsCppWrapper : mbedtls_ssl_read FAILED : {}", GetErrorName(read_value));
     return false;
   }
   out_read_size = (size_t)read_value;
-  return true;
+  return (read_value > 0);
 }
 
 bool MtlsCppSsl::Write(const void* buffer, int size, size_t& out_write_size) {

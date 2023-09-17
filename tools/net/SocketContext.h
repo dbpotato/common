@@ -23,7 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Utils.h"
+#include "NetUtils.h"
 
 #include <string>
 #include <memory>

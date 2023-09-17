@@ -46,13 +46,13 @@ set(COMMON_DIR "${PROJECT_SOURCE_DIR}/../../.")
 set(SRC_DIR "${PROJECT_SOURCE_DIR}")
 
 
-if(DEFINED ENV{CXX})
-  message("Using user's compiler : " $ENV{CXX})
-  set(CMAKE_CXX_COMPILER $ENV{CXX})
+if(DEFINED ENV{CUSTOM_CXX})
+  message("Using user's compiler : " $ENV{CUSTOM_CXX})
+  set(CMAKE_CXX_COMPILER $ENV{CUSTOM_CXX})
 else(DEFINED ENV{CXX})
   message("Using default compiler : " ${DEFAULT_CXX})
   set(CMAKE_CXX_COMPILER ${DEFAULT_CXX})
-endif(DEFINED ENV{CXX})
+endif(DEFINED ENV{CUSTOM_CXX})
 
 
 set(LIBS
@@ -67,6 +67,7 @@ include_directories(
   ${COMMON_DIR}/tools/logger
   ${COMMON_DIR}/tools/utils
   ${COMMON_DIR}/tools/net
+  ${COMMON_DIR}/tools/net/utils
   ${COMMON_DIR}/tools/net/http
   ${COMMON_DIR}/tools/net/http/websocket/common
   ${COMMON_DIR}/tools/net/http/websocket/server

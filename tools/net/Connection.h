@@ -23,8 +23,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "NetUtils.h"
 #include "SocketObject.h"
-#include "Utils.h"
 
 #include <map>
 #include <string>
