@@ -30,11 +30,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 class SocketObject;
 class ThreadLoop;
 
-class SocketInfo {
+
+class FdListener {
+public :
+  virtual int GetFd() = 0;
+  virtual void OnFdReadReady() = 0;
+  virtual void OnFdWriteReady() = 0;
+};
+
+class FdListenerInfo {
 public:
-  SocketInfo(std::weak_ptr<SocketObject> object);
-  std::shared_ptr<SocketObject> lock();
-  std::weak_ptr<SocketObject> _object;
+  FdListenerInfo(std::weak_ptr<FdListener> object);
+  std::shared_ptr<FdListener> lock();
+  std::weak_ptr<FdListener> _object;
   int _event_flags;
 };
 
@@ -44,13 +52,13 @@ public:
   static std::shared_ptr<Epool> GetInstance();
   ~Epool();
   bool Init();
-  void AddSocket(std::shared_ptr<SocketObject> obj);
-  void RemoveSocket(int socket_fd);
-  void SetObservedEvent(int socket_fd, int event_flag, bool enabled);
+  void AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read = false);
+  void RemoveListener(int fd);
+  void SetObservedEvent(int fd, int event_flag, bool enabled);
 
-  void SetSocketAwaitingFlags(std::shared_ptr<SocketObject> obj, bool waiting_for_read, bool waiting_for_write);
-  void SetSocketAwaitingWrite(std::shared_ptr<SocketObject> obj, bool waiting_for_write);
-  void SetSocketAwaitingRead(std::shared_ptr<SocketObject> obj, bool waiting_for_read);
+  void SetListenerAwaitingFlags(std::shared_ptr<FdListener> obj, bool waiting_for_read, bool waiting_for_write);
+  void SetListenerAwaitingWrite(std::shared_ptr<FdListener> obj, bool waiting_for_write);
+  void SetListenerAwaitingRead(std::shared_ptr<FdListener> obj, bool waiting_for_read);
 
 protected:
   Epool();
@@ -60,9 +68,9 @@ private:
   void Wake();
   void ClearWake();
   void WaitForEvents();
-  void HandleSocketEvent(int socket_fd, int event);
+  void HandleFdEvent(int fd, int event);
   int _epool_fd;
   int _wake_up_fd;
-  std::map<int, SocketInfo> _sockets;
+  std::map<int, FdListenerInfo> _listeners;
   std::shared_ptr<ThreadLoop> _thread_loop;
 };

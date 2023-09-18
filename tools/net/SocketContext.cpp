@@ -142,7 +142,7 @@ void SocketContext::Connect(std::shared_ptr<Client> client) {
       inet_ntop(_info_next->ai_family, addr, ipstr, sizeof ipstr);
 
       client->Update(_socket_fd, std::string(ipstr));
-      Epool::GetInstance()->AddSocket(client);
+      Epool::GetInstance()->AddListener(client);
       SetState(NextState());
       return;
     }

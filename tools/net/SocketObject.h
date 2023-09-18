@@ -23,12 +23,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "Epool.h"
+
 #include <memory>
 
 class Connection;
 class SocketContext;
 
-class SocketObject : public std::enable_shared_from_this<SocketObject> {
+class SocketObject : public std::enable_shared_from_this<SocketObject>
+                   , public FdListener {
 
 public:
  SocketObject(int socket_fd,
@@ -38,13 +41,18 @@ public:
  virtual ~SocketObject();
 
  bool IsServerSocket();
- int SocketFd();
  std::shared_ptr<SocketContext> GetContext();
  std::shared_ptr<Connection> GetConnection();
  bool IsActive();
  bool IsValid();
  void SetActive(bool is_active);
  virtual void OnConnectionClosed();
+
+ //FdListener
+ int GetFd() override;
+ void OnFdReadReady() override;
+ void OnFdWriteReady() override;
+
 protected:
  int _socket_fd;
  bool _is_server_socket;

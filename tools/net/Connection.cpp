@@ -127,8 +127,8 @@ std::shared_ptr<Server> Connection::CreateServer(int port,
                           context,
                           listeners));
   server->Init();
-  _epool->AddSocket(server);
-  _epool->SetSocketAwaitingRead(server, true);
+  _epool->AddListener(server);
+  _epool->SetListenerAwaitingRead(server, true);
   return server;
 }
 
@@ -205,9 +205,9 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
 
   std::shared_ptr<Server> server = std::static_pointer_cast<Server>(obj);
 
-  int socket = accept(server->SocketFd(), &client_addr, &client_addr_len);
+  int socket = accept(server->GetFd(), &client_addr, &client_addr_len);
   if(socket < 0) {
-    DLOG(warn, "Connection::Accept fail on socket : {}", server->SocketFd());
+    DLOG(warn, "Connection::Accept fail on socket : {}", server->GetFd());
     return;
   }
 
@@ -232,7 +232,7 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
                           std::stoi(std::string(port_buf)),
                           {},//url
                           server));
-  _epool->AddSocket(client);
+  _epool->AddListener(client);
   _connector->AddClient(client);
 }
 
@@ -247,12 +247,12 @@ void Connection::NotifySocketActiveChanged(std::shared_ptr<SocketObject> obj) {
   }
   if(obj->IsActive()) {
     if(HasObjectPendingWrite(obj)) {
-      _epool->SetSocketAwaitingFlags(obj, true, true);
+      _epool->SetListenerAwaitingFlags(obj, true, true);
     } else {
-      _epool->SetSocketAwaitingRead(obj, true);
+      _epool->SetListenerAwaitingRead(obj, true);
     }
   } else {
-    _epool->SetSocketAwaitingFlags(obj, false, false);
+    _epool->SetListenerAwaitingFlags(obj, false, false);
   }
 }
 
@@ -275,7 +275,7 @@ void Connection::OnSocketReadReady(std::shared_ptr<SocketObject> obj) {
     }
   }
   if(obj->IsValid() && obj->IsActive() && connected) {
-    _epool->SetSocketAwaitingRead(obj, true);
+    _epool->SetListenerAwaitingRead(obj, true);
   }
 }
 
@@ -299,7 +299,7 @@ bool Connection::Read(std::shared_ptr<Client> obj) {
 }
 
 bool Connection::SocketRead(std::shared_ptr<Client> obj, void* dest, int dest_size, size_t& out_read_size) {
-  ssize_t result = read(obj->SocketFd(), dest, dest_size);
+  ssize_t result = read(obj->GetFd(), dest, dest_size);
   out_read_size = (result > 0) ? (size_t)result : 0;
   if(result < 0) {
     if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -321,7 +321,7 @@ void Connection::OnSocketWriteReady(std::shared_ptr<SocketObject> obj) {
     return;
   }
 
-  int socket_fd = client->SocketFd();
+  int socket_fd = client->GetFd();
   auto it = _write_reqs.find(socket_fd);
 
   if(it == _write_reqs.end()) {
@@ -339,7 +339,7 @@ void Connection::OnSocketWriteReady(std::shared_ptr<SocketObject> obj) {
     } else if(completed) {
       vec_it = req_vec.erase(vec_it);
     } else {
-      _epool->SetSocketAwaitingWrite(obj, true);
+      _epool->SetListenerAwaitingWrite(obj, true);
       break;
     }
   }
@@ -389,7 +389,7 @@ bool Connection::Write(std::shared_ptr<Client> obj, MessageWriteRequest& req, bo
 }
 
 bool Connection::SocketWrite(std::shared_ptr<Client> obj, const void* buffer, int size, size_t& out_write_size) {
-  ssize_t result = write(obj->SocketFd(), buffer, size);
+  ssize_t result = write(obj->GetFd(), buffer, size);
   out_write_size = (result > 0) ? (size_t)result : 0;
   if(result < 0) {
     if(errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -401,14 +401,14 @@ bool Connection::SocketWrite(std::shared_ptr<Client> obj, const void* buffer, in
 
 
 void Connection::OnSocketClosed(std::shared_ptr<SocketObject> obj) {
-  _write_reqs.erase(obj->SocketFd());
+  _write_reqs.erase(obj->GetFd());
   obj->OnConnectionClosed();
-  _epool->RemoveSocket(obj->SocketFd());
+  _epool->RemoveListener(obj->GetFd());
 }
 
 void Connection::OnSocketDestroyed(int socket_fd) {
   _write_reqs.erase(socket_fd);
-  _epool->RemoveSocket(socket_fd);
+  _epool->RemoveListener(socket_fd);
 }
 
 void Connection::SendMsg(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
@@ -420,14 +420,14 @@ void Connection::SendMsg(std::shared_ptr<Client> client, std::shared_ptr<Message
   MessageWriteRequest req(msg);
 
   bool write_complete = false;
-  int socket_fd = client->SocketFd();
+  int socket_fd = client->GetFd();
 
   if(!HasObjectPendingWrite(client)) {
     if(!Write(client, req, write_complete)){
       OnSocketClosed(client);
     }
     if(!write_complete) {
-      _epool->SetSocketAwaitingWrite(client, true);
+      _epool->SetListenerAwaitingWrite(client, true);
     }
   }
 
@@ -437,7 +437,7 @@ void Connection::SendMsg(std::shared_ptr<Client> client, std::shared_ptr<Message
 }
 
 bool Connection::HasObjectPendingWrite(std::shared_ptr<SocketObject> obj) {
-  int socket_fd = obj->SocketFd();
+  int socket_fd = obj->GetFd();
 
   auto it = _write_reqs.find(socket_fd);
   if(it != _write_reqs.end()) {

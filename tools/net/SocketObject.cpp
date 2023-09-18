@@ -44,12 +44,20 @@ SocketObject::~SocketObject() {
   }
 }
 
-bool SocketObject::IsServerSocket() {
-  return _is_server_socket;
+int SocketObject::GetFd() {
+  return _socket_fd;
 }
 
-int SocketObject::SocketFd() {
-  return _socket_fd;
+void SocketObject::OnFdReadReady() {
+  _connection->OnSocketReadReady(shared_from_this());
+}
+
+void SocketObject::OnFdWriteReady() {
+  _connection->OnSocketWriteReady(shared_from_this());
+}
+
+bool SocketObject::IsServerSocket() {
+  return _is_server_socket;
 }
 
 std::shared_ptr<SocketContext> SocketObject::GetContext() {

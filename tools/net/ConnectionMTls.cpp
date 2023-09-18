@@ -180,7 +180,7 @@ NetError ConnectionMTls::AfterSocketCreated(std::shared_ptr<SocketObject> obj) {
   auto context = std::static_pointer_cast<SocketContextMtls>(obj->GetContext());
   auto client = std::static_pointer_cast<Client>(obj);
 
-  if(!context->SetSocket(obj->SocketFd(), client->GetUrl())){
+  if(!context->SetSocket(obj->GetFd(), client->GetUrl())){
     return NetError::FAILED;
   }
   return context->MakeHandshake();

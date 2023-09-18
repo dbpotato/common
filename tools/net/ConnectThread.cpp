@@ -65,9 +65,9 @@ void ConnectThread::Continue(std::shared_ptr<Client> client) {
   NetError err = context->Continue(client, true);
   if((err == NetError::NEEDS_READ) || (err == NetError::NEEDS_WRITE)) {
     if(err == NetError::NEEDS_READ) {
-      _epool->SetSocketAwaitingRead(client, true);
+      _epool->SetListenerAwaitingRead(client, true);
     } else {
-      _epool->SetSocketAwaitingWrite(client, true);
+      _epool->SetListenerAwaitingWrite(client, true);
     }
   } else if (err != NetError::RETRY) {
     OnConnectComplete(client, err);
@@ -94,9 +94,9 @@ void ConnectThread::ConnectClients() {
       ++it;
     } else if((err == NetError::NEEDS_READ) || (err == NetError::NEEDS_WRITE)) {
       if(err == NetError::NEEDS_READ) {
-        _epool->SetSocketAwaitingRead(client, true);
+        _epool->SetListenerAwaitingRead(client, true);
       } else {
-        _epool->SetSocketAwaitingWrite(client, true);
+        _epool->SetListenerAwaitingWrite(client, true);
       }
       ++it;
     } else {
@@ -114,7 +114,7 @@ void ConnectThread::OnConnectComplete(std::shared_ptr<Client> client, NetError e
   bool client_accept = client->OnConnecting(err);
   if((err == NetError::OK) && client_accept) {
     if(client->IsActive()) {
-      _epool->SetSocketAwaitingRead(client, true);
+      _epool->SetListenerAwaitingRead(client, true);
     }
     client->OnConnected();
   }

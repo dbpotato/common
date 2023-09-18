@@ -38,12 +38,12 @@ constexpr int EPOOL_MAX_EVENTS = 32;
 
 std::weak_ptr<Epool> Epool::_instance;
 
-SocketInfo::SocketInfo(std::weak_ptr<SocketObject> object)
+FdListenerInfo::FdListenerInfo(std::weak_ptr<FdListener> object)
     : _object(object)
     , _event_flags(0) {
 }
 
-std::shared_ptr<SocketObject> SocketInfo::lock() {
+std::shared_ptr<FdListener> FdListenerInfo::lock() {
   return _object.lock();
 }
 
@@ -126,84 +126,88 @@ void Epool::ClearWake() {
   }
 }
 
-void Epool::AddSocket(std::shared_ptr<SocketObject> obj) {
+void Epool::AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read) {
   if(_thread_loop->OnDifferentThread()) {
-    _thread_loop->Post(std::bind(&Epool::AddSocket, shared_from_this(), obj));
+    _thread_loop->Post(std::bind(&Epool::AddListener, shared_from_this(), obj, wait_for_read));
     Wake();
     return;
   }
 
-  int socket_fd = obj->SocketFd();
-  auto result = _sockets.insert(std::make_pair<int,SocketInfo>((int)socket_fd, SocketInfo(obj)));
+  int fd = obj->GetFd();
+  auto result = _listeners.insert(std::make_pair<int, FdListenerInfo>(std::move(obj->GetFd()), FdListenerInfo(obj)));
   if(!result.second) {
-    DLOG(error, "Epool::AddSocket FAILED - Already exists : {}", socket_fd);
+    DLOG(error, "Epool::AddListener FAILED - Already exists : {}", fd);
     return;
   }
   struct epoll_event event;
   std::memset(&event, 0 , sizeof(epoll_event));
-  event.data.fd = socket_fd;
+  event.data.fd = fd;
 
-  if (epoll_ctl(_epool_fd, EPOLL_CTL_ADD, socket_fd, &event) == -1) {
-    DLOG(error, "Epool::AddSocket FAILED - EPOLL_CTL_ADD : {}", socket_fd);
+  if (epoll_ctl(_epool_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
+    DLOG(error, "Epool::AddListener FAILED - EPOLL_CTL_ADD : {}", fd);
+  }
+
+  if(wait_for_read) {
+    SetObservedEvent(fd, EPOLLIN, true);
   }
 }
 
-void Epool::RemoveSocket(int socket_fd) {
+void Epool::RemoveListener(int fd) {
   if(_thread_loop->OnDifferentThread()) {
-    _thread_loop->Post(std::bind(&Epool::RemoveSocket, shared_from_this(), socket_fd));
+    _thread_loop->Post(std::bind(&Epool::RemoveListener, shared_from_this(), fd));
     Wake();
     return;
   }
 
-  _sockets.erase(socket_fd);
-  epoll_ctl(_epool_fd, EPOLL_CTL_DEL, socket_fd, nullptr);
-  close(socket_fd);
+  _listeners.erase(fd);
+  epoll_ctl(_epool_fd, EPOLL_CTL_DEL, fd, nullptr);
+  close(fd);
 }
 
-void Epool::SetSocketAwaitingRead(std::shared_ptr<SocketObject> obj, bool waiting_for_read) {
-  SetObservedEvent(obj->SocketFd(), EPOLLIN, waiting_for_read);
+void Epool::SetListenerAwaitingRead(std::shared_ptr<FdListener> obj, bool waiting_for_read) {
+  SetObservedEvent(obj->GetFd(), EPOLLIN, waiting_for_read);
 }
 
-void Epool::SetSocketAwaitingWrite(std::shared_ptr<SocketObject> obj, bool waiting_for_write) {
-  SetObservedEvent(obj->SocketFd(), EPOLLOUT, waiting_for_write);
+void Epool::SetListenerAwaitingWrite(std::shared_ptr<FdListener> obj, bool waiting_for_write) {
+  SetObservedEvent(obj->GetFd(), EPOLLOUT, waiting_for_write);
 }
 
-void Epool::SetSocketAwaitingFlags(std::shared_ptr<SocketObject> obj, bool waiting_for_read, bool waiting_for_write) {
+void Epool::SetListenerAwaitingFlags(std::shared_ptr<FdListener> obj, bool waiting_for_read, bool waiting_for_write) {
   if(_thread_loop->OnDifferentThread()) {
-    _thread_loop->Post(std::bind(&Epool::SetSocketAwaitingFlags, shared_from_this(), obj, waiting_for_read, waiting_for_write));
+    _thread_loop->Post(std::bind(&Epool::SetListenerAwaitingFlags, shared_from_this(), obj, waiting_for_read, waiting_for_write));
     Wake();
     return;
   }
-  SetSocketAwaitingRead(obj, waiting_for_read);
-  SetSocketAwaitingWrite(obj, waiting_for_write);
+  SetListenerAwaitingRead(obj, waiting_for_read);
+  SetListenerAwaitingWrite(obj, waiting_for_write);
 }
 
-void Epool::SetObservedEvent(int socket_fd, int event_flag, bool enabled) {
+void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
   if(_thread_loop->OnDifferentThread()) {
-    _thread_loop->Post(std::bind(&Epool::SetObservedEvent, shared_from_this(), socket_fd, event_flag, enabled));
+    _thread_loop->Post(std::bind(&Epool::SetObservedEvent, shared_from_this(), fd, event_flag, enabled));
     Wake();
     return;
   }
 
-  auto socket_it =_sockets.find(socket_fd);
-  if(socket_it == _sockets.end()) {
-    DLOG(warn, "Epool::HandleSocketEvent - SocketObject not found : {}", socket_fd);
+  auto listener_it = _listeners.find(fd);
+  if(listener_it == _listeners.end()) {
+    DLOG(warn, "Epool::SetObservedEvent - listener not found : {}", fd);
     return;
   }
 
-  int current_flags = socket_it->second._event_flags;
+  int current_flags = listener_it->second._event_flags;
   struct epoll_event event;
   std::memset(&event, 0 , sizeof(epoll_event));
-  event.data.fd = socket_fd;
+  event.data.fd = fd;
   if(enabled) {
     event.events = current_flags | event_flag;
   } else {
     event.events = current_flags & ~event_flag;
   }
-  socket_it->second._event_flags = event.events;
+  listener_it->second._event_flags = event.events;
 
-  if (epoll_ctl(_epool_fd, EPOLL_CTL_MOD, socket_fd, &event) == -1) {
-    DLOG(error, "Epool : EPOLL_CTL_MOD failed : {} : {} : {}", socket_fd, current_flags, event.events);
+  if (epoll_ctl(_epool_fd, EPOLL_CTL_MOD, fd, &event) == -1) {
+    DLOG(error, "Epool : EPOLL_CTL_MOD failed : {} : {} : {}", fd, current_flags, (uint32_t)event.events);
   }
 }
 
@@ -217,41 +221,38 @@ void Epool::WaitForEvents() {
   int epool_size = epoll_wait(_epool_fd, events.data(), EPOOL_MAX_EVENTS, -1);
 
   for (int i = 0; i < epool_size; ++i) {
-    int socket_fd = (int)events[i].data.fd;
-    if(socket_fd == _wake_up_fd) {
+    int fd = (int)events[i].data.fd;
+    if(fd == _wake_up_fd) {
       ClearWake();
       continue;
     }
     int event = events[i].events;
-    if(!(event & EPOLLIN) && !(event & EPOLLOUT)) {
-      continue;
-    }
-    SetObservedEvent(socket_fd, event, false);
-    HandleSocketEvent(socket_fd, event);
+    SetObservedEvent(fd, event, false);
+    HandleFdEvent(fd, event);
   }
   _thread_loop->Post(std::bind(&Epool::WaitForEvents, shared_from_this()));
 }
 
-void Epool::HandleSocketEvent(int socket_fd, int event) {
-  auto socket_it =_sockets.find(socket_fd);
-  if(socket_it == _sockets.end()) {
-    DLOG(warn, "Epool::HandleSocketEvent - SocketObject not found : {}", socket_fd);
+void Epool::HandleFdEvent(int fd, int event) {
+  auto listener_it =_listeners.find(fd);
+  if(listener_it == _listeners.end()) {
+    DLOG(warn, "Epool::HandleFdEvent - Listener Object not found : {}", fd);
     return;
   }
 
-  auto wrapper = socket_it->second;
-  auto socket_obj = wrapper.lock();
-  if(!socket_obj) {
-    DLOG(warn, "Epool::HandleSocketEvent  - SocketObject already released : {}", socket_fd);
-    RemoveSocket(socket_fd);
+  auto wrapper = listener_it->second;
+  auto obj = wrapper.lock();
+  if(!obj) {
+    DLOG(warn, "Epool::HandleFdEvent  - Listener Object already released : {}", fd);
+    RemoveListener(fd);
     return;
   }
 
   if(event & EPOLLIN) {
-    socket_obj->GetConnection()->OnSocketReadReady(socket_obj);
+    obj->OnFdReadReady();
   }
 
   if(event & EPOLLOUT) {
-    socket_obj->GetConnection()->OnSocketWriteReady(socket_obj);
+    obj->OnFdWriteReady();
   }
 }
