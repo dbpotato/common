@@ -77,7 +77,7 @@ void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::s
       server->OnWsPong(client);
       break;
     default:
-      DLOG(error, "Invalid op code : {}", header->_opcode);
+      DLOG(error, "Invalid op code : {}", (int)header->_opcode);
       break;
   }
 }

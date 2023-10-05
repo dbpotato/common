@@ -52,7 +52,7 @@ SocketContext::SocketContext(SocketContext::State init_state)
   if(_state != GETTING_INFO &&
      _state != AFTER_ACCEPTING &&
      _state != FINISHED) {
-    DLOG(error, "Unexpected initialize state : {}", _state);
+    DLOG(error, "Unexpected initialize state : {}", (int)_state);
     _state = FAILED;
     return;
   }

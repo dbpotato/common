@@ -56,7 +56,7 @@ void ClientHandler::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr
 bool ClientHandler::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
   bool verified = IsClientVerified(client);
   log()->info("Client connecting : err : {}, ssl verified : {}",
-              err,
+              (int)err,
               verified);
   return true;
 }

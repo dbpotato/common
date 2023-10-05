@@ -26,14 +26,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef DISABLE_SPD_LOGGER
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/pattern_formatter.h>
 
 #ifdef __ANDROID__
 #include <android/log.h>
 
-static const char* DEFAULT_LOGGER_PATTERN  = "%v";
-static const char* DEFAULT_ANDROID_LOG_TAG = "Logger";
+static const std::string DEFAULT_LOGGER_PATTERN  = "%v";
+static const std::string DEFAULT_ANDROID_LOG_TAG = "Logger";
 #else
-static const char* DEFAULT_LOGGER_PATTERN = "[%H:%M:%S:%e] [%t] [%l] %v";
+static const std::string DEFAULT_LOGGER_PATTERN = "[%H:%M:%S:%e] [%t] [%l] %v";
 #endif
 
 
@@ -41,7 +43,9 @@ class func_sink : public spdlog::sinks::sink {
 public:
   func_sink():
       _log_func(nullptr),
-      _log_func_arg(nullptr) {
+      _log_func_arg(nullptr),
+      _formatter(nullptr) {
+    _formatter = spdlog::details::make_unique<spdlog::pattern_formatter>();
   }
 
   virtual ~func_sink(){;}
@@ -53,26 +57,56 @@ public:
 
   void log(const spdlog::details::log_msg& msg) override {
     std::lock_guard<std::mutex> lock(_mutex);
+
+    spdlog::memory_buf_t formatted;
+    _formatter->format(msg, formatted);
+    std::string formatted_msg = std::string(formatted.data(), formatted.size());
+
     if(_log_func) {
-      if(msg.formatted.size())
-        _log_func(msg.level, std::string(msg.formatted.data(), msg.formatted.size() - 1), _log_func_arg);
+      if(formatted_msg.size()) {
+        _log_func(msg.level, formatted_msg.substr(0, formatted_msg.size() - 1), _log_func_arg);
+      }
     }
     else{
 #ifdef __ANDROID__
       __android_log_print(android_log_level(msg.level),
                           DEFAULT_ANDROID_LOG_TAG,
                           "%s",
-                          std::string(msg.formatted.data(), msg.formatted.size() - 1).c_str());
+                          formatted_msg.substr(0, formatted_msg.size() - 1).c_str());
 #else
-      fwrite(msg.formatted.data(), sizeof(char), msg.formatted.size(), stdout);
+      fwrite(formatted_msg.c_str(), sizeof(char), formatted_msg.size(), stdout);
       flush();
 #endif
     }
+  }
+  void set_pattern(const std::string &pattern) override {
+    std::lock_guard<std::mutex> lock(_mutex);
+    set_pattern_int(pattern);
+  }
+
+  void set_formatter(std::unique_ptr<spdlog::formatter> sink_formatter) override {
+    std::lock_guard<std::mutex> lock(_mutex);
+    set_formatter_int(std::move(sink_formatter));
   }
 protected:
   void flush() override {
     fflush(stdout);
   }
+
+  void set_pattern_int(const std::string &pattern){
+    set_formatter_int(spdlog::details::make_unique<spdlog::pattern_formatter>(pattern));
+  }
+
+  void set_formatter_int(std::unique_ptr<spdlog::formatter> sink_formatter) {
+    _formatter = std::move(sink_formatter);
+  }
+
+  spdlog::string_view_t format(const spdlog::details::log_msg &msg) {
+    spdlog::memory_buf_t formatted;
+    _formatter->format(msg, formatted);
+    return spdlog::string_view_t(formatted.data(), formatted.size());
+  }
+
 #ifdef __ANDROID__
   android_LogPriority android_log_level(spdlog::level::level_enum level){
     switch (level) {
@@ -96,6 +130,7 @@ protected:
   std::mutex _mutex;
   void(*_log_func)(spdlog::level::level_enum, const std::string&, void*);
   void* _log_func_arg;
+  std::unique_ptr<spdlog::formatter> _formatter;
 };
 
 
@@ -107,6 +142,11 @@ public:
     return instance;
   }
 
+  static std::shared_ptr<spdlog::sinks::basic_file_sink_mt> CreateFileSink(const std::string& log_file_path) {
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file_path, false);
+    return file_sink;
+  }
+
   void SetLogFunc(void(*func)(spdlog::level::level_enum,
                               const std::string&, void*),
                               int id_looger,
@@ -115,17 +155,26 @@ public:
     sink->SetLogFunc(func, log_func_arg);
   }
 
-  void SetPattern(const char* pattern, int id_looger = 0) {
+  void SetPattern(const std::string& pattern, int id_looger = 0) {
     auto logger = GetLogger(id_looger);
     logger->set_pattern(pattern);
   }
 
   bool Init(int id_looger, std::shared_ptr<spdlog::sinks::sink> additional_sink = nullptr) {
-    if(InternalGet(id_looger))
+    if(InternalGet(id_looger)) {
       return false;
+    }
 
     InternalInitialize(id_looger, additional_sink);
     return true;
+  }
+
+  bool Init(int id_looger, const std::string& log_file_path) {
+    return Init(id_looger, CreateFileSink(log_file_path));
+  }
+
+  bool Init(const std::string& log_file_path) {
+    return Init(0, log_file_path);
   }
 
   std::shared_ptr<spdlog::logger> GetLogger(int id) {
@@ -155,14 +204,15 @@ protected:
       return recheck;
 
     auto sink = std::make_shared<func_sink>();
-    std::shared_ptr<spdlog::logger> logger;
-
-    if(additional_sink)
-      logger = spdlog::details::registry::instance().create(std::to_string(id), {sink, additional_sink});
-    else
-      logger = spdlog::details::registry::instance().create(std::to_string(id), sink);
-
+    std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>(std::move(std::to_string(id)),
+                                             std::move(sink));
+    if(additional_sink) {
+      logger->sinks().push_back(additional_sink);
+    }
     logger->set_pattern(DEFAULT_LOGGER_PATTERN);
+    logger->flush_on(spdlog::level::info);
+    spdlog::details::registry::instance().register_logger(logger);
+
     if(!id)
       _default_logger = logger;
 

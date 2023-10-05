@@ -58,7 +58,7 @@ bool ServerListener::OnClientConnecting(std::shared_ptr<Client> client, NetError
   bool verified = IsClientVerified(client);
   log()->info("Client {} : Connecting : err : {} , ssl verified : {}",
               client->GetId(),
-              err,
+              (int)err,
               verified);
   return true;
 }
