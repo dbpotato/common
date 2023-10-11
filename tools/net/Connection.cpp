@@ -269,7 +269,10 @@ void Connection::OnSocketReadReady(std::shared_ptr<SocketObject> obj) {
     auto client = std::static_pointer_cast<Client>(obj);
     connected = client->IsConnected();
     if(connected) {
-      Read(client);
+      bool read_again = Read(client);
+      while (read_again) {
+        read_again = Read(client);
+      }
     } else {
       _connector->Continue(client);
     }

@@ -44,16 +44,22 @@ size_t ProxyChannel::GetId() {
 
 void ProxyChannel::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
   if(client == _src_client) {
-    auto processed_msg = _proxy->OnClientMessageRead(msg);
+    auto processed_msg = _proxy->OnClientMessageRead(client, msg);
+    if(!processed_msg) {
+      return;
+    }
+
     if(_dest_client) {
       _dest_client->Send(processed_msg);
     } else {
       _pending_msgs.emplace_back(processed_msg);
-      _proxy->CreateHostClient(shared_from_this());
+      _proxy->CreateHostClient(shared_from_this(), client, msg);
     }
   } else {
-    auto processed_msg = _proxy->OnHostMessageRead(msg);
-    _src_client->Send(processed_msg);
+    auto processed_msg = _proxy->OnHostMessageRead(client, msg);
+    if(processed_msg) {
+      _src_client->Send(processed_msg);
+    }
   }
 }
 

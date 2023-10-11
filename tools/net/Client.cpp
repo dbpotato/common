@@ -113,6 +113,11 @@ int Client::GetPort() {
 }
 
 bool Client::Send(std::shared_ptr<Message> msg) {
+  if(!msg) {
+    DLOG(error, "Client::Send - message is null");
+    return false;
+  }
+
   if(!IsActive()) {
     DLOG(error, "Client::Send - client is not active");
     return false;

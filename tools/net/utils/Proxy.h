@@ -42,9 +42,11 @@ public:
   Proxy(int listen_port, std::string host_url, int host_port);
   bool Init();
   virtual std::unique_ptr<MessageBuilder> CreateHostMessageBuilder();
-  virtual void CreateHostClient(std::shared_ptr<ProxyChannel> channel);
-  virtual std::shared_ptr<Message> OnClientMessageRead(std::shared_ptr<Message> msg);
-  virtual std::shared_ptr<Message> OnHostMessageRead(std::shared_ptr<Message> msg);
+  virtual void CreateHostClient(std::shared_ptr<ProxyChannel> channel,
+                              std::shared_ptr<Client> client,
+                              std::shared_ptr<Message> msg);
+  virtual std::shared_ptr<Message> OnClientMessageRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
+  virtual std::shared_ptr<Message> OnHostMessageRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
   void OnChannelClosed(std::shared_ptr<ProxyChannel>);
 
 

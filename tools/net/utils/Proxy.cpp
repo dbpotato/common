@@ -61,15 +61,17 @@ std::unique_ptr<MessageBuilder> Proxy::CreateClientMessageBuilder() {
   return nullptr;
 }
 
-void Proxy::CreateHostClient(std::shared_ptr<ProxyChannel> channel) {
+void Proxy::CreateHostClient(std::shared_ptr<ProxyChannel> channel,
+                            std::shared_ptr<Client> client,
+                            std::shared_ptr<Message> msg) {
   _host_connection->CreateClient(_host_port, _host_url, channel);
 }
 
-std::shared_ptr<Message> Proxy::OnClientMessageRead(std::shared_ptr<Message> msg) {
+std::shared_ptr<Message> Proxy::OnClientMessageRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
   return msg;
 }
 
-std::shared_ptr<Message> Proxy::OnHostMessageRead(std::shared_ptr<Message> msg) {
+std::shared_ptr<Message> Proxy::OnHostMessageRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
   return msg;
 }
 
