@@ -32,7 +32,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 std::atomic<uint32_t> Client::_id_counter(0);
 
-void ClientManager::OnServerCreated(std::weak_ptr<Server> server) {
+void ClientManager::OnServerCreated(std::shared_ptr<Server> server) {
 }
 
 void ClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
@@ -87,6 +87,10 @@ void Client::Update(int socket, const std::string& ip) {
   _ip = ip;
 }
 
+void Client::AddListener(std::weak_ptr<ClientManager> manager) {
+  _listeners.push_back(manager);
+}
+
 void Client::SetManager(std::weak_ptr<ClientManager> manager) {
   _manager = manager;
 }
@@ -94,7 +98,6 @@ void Client::SetManager(std::weak_ptr<ClientManager> manager) {
 void Client::SetMsgBuilder(std::unique_ptr<MessageBuilder> msg_builder) {
   _msg_builder = std::move(msg_builder);
 }
-
 
 uint32_t Client::GetId() {
   return _id;
@@ -143,6 +146,7 @@ bool Client::OnConnecting(NetError err) {
   if(auto manager = _manager.lock()) {
     return manager->OnClientConnecting(SharedPtr(), err);
   }
+
   return false;
 }
 
@@ -151,11 +155,24 @@ void Client::OnConnected() {
   if(auto manager = _manager.lock()) {
     manager->OnClientConnected(SharedPtr());
   }
+
+  for(auto listener_wp : _listeners) {
+    if(auto listener = listener_wp.lock()) {
+      listener->OnClientConnected(SharedPtr());
+    }
+  }
 }
 
 void Client::OnMsgWrite(std::shared_ptr<Message> msg, bool status) {
-  if(auto manager = _manager.lock())
+  if(auto manager = _manager.lock()) {
     manager->OnMsgSent(SharedPtr(), msg, status);
+  }
+
+  for(auto listener_wp : _listeners) {
+    if(auto listener = listener_wp.lock()) {
+      listener->OnMsgSent(SharedPtr(), msg, status);
+    }
+  }
 }
 
 void Client::OnDataRead(std::shared_ptr<Data> data) {
@@ -172,11 +189,22 @@ void Client::OnDataRead(std::shared_ptr<Data> data) {
     }
     if(msgs.size()) {
       for(auto msg : msgs) {
-        manager->OnClientRead(SharedPtr(), msg);
+        OnMessageRead(msg);
       }
     }
   } else {
-    manager->OnClientRead(SharedPtr(), std::make_shared<Message>(data));
+    OnMessageRead(std::make_shared<Message>(data));
+  }
+}
+
+void Client::OnMessageRead(std::shared_ptr<Message> message) {
+  auto manager = _manager.lock();
+  manager->OnClientRead(SharedPtr(), message);
+
+  for(auto listener_wp : _listeners) {
+    if(auto listener = listener_wp.lock()) {
+      listener->OnClientRead(SharedPtr(), message);
+    }
   }
 }
 
@@ -184,5 +212,10 @@ void Client::OnConnectionClosed() {
   SocketObject::OnConnectionClosed();
   if(auto manager = _manager.lock()) {
     manager->OnClientClosed(SharedPtr());
+  }
+  for(auto listener_wp : _listeners) {
+    if(auto listener = listener_wp.lock()) {
+      listener->OnClientClosed(SharedPtr());
+    }
   }
 }

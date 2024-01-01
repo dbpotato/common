@@ -27,7 +27,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "NetUtils.h"
 #include "SocketObject.h"
 
+#include <atomic>
 #include <mutex>
+
 
 class SocketContext;
 class Connection;
@@ -39,7 +41,7 @@ class Server;
 
 class ClientManager {
 public:
-  virtual void OnServerCreated(std::weak_ptr<Server> server);
+  virtual void OnServerCreated(std::shared_ptr<Server> server);
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg);
   virtual bool OnClientConnecting(std::shared_ptr<Client> client, NetError err);
   virtual void OnClientConnected(std::shared_ptr<Client> client);
@@ -62,6 +64,10 @@ public:
   int GetPort();
   std::shared_ptr<Client> SharedPtr();
   bool IsConnected();
+  /*
+  * Not thread safe. Don't call from other listeners.
+  */
+  void AddListener(std::weak_ptr<ClientManager> manager);
   void SetManager(std::weak_ptr<ClientManager> manager);
   void SetMsgBuilder(std::unique_ptr<MessageBuilder> msg_builder);
 
@@ -82,11 +88,12 @@ private:
          int port = DEFAULT_SOCKET,
          const std::string& url = {},
          std::weak_ptr<ClientManager> manager = {});
-
+  void OnMessageRead(std::shared_ptr<Message> message);
   std::string _ip;
   int _port;
   std::string _url;
   std::weak_ptr<ClientManager> _manager;
+  std::vector<std::weak_ptr<ClientManager>> _listeners;
   uint32_t _id;
   bool _is_connected;
   std::unique_ptr<MessageBuilder> _msg_builder;

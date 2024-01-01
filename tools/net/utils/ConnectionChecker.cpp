@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018-2023 Adam Kaniewski
+Copyright (c) 2018-2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,106 +22,222 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "ConnectionChecker.h"
-#include "Connection.h"
-#include "Logger.h"
-
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <ctime>
-#include <chrono>
-#include <thread>
+#include "ThreadLoop.h"
 
 
-ConnectionChecker::ConnectionChecker(std::shared_ptr<Connection> connection,
-                                     size_t check_interval_in_sec,
-                                     const std::string& server_url,
-                                     int server_port)
-  : _connection(connection)
-  , _check_interval_in_sec(check_interval_in_sec)
-  , _server_url(server_url)
-  , _server_port(server_port)
-  , _state(NOT_CONNECTED) {
+static const MonitorTask::uint32_seconds RECHECK_TIME{2};
+static const MonitorTask::uint32_seconds INACTIVITY_TIME{8};
+
+std::weak_ptr<ConnectionChecker> ConnectionChecker::_instance;
+
+
+MonitorTask::uint32_time_point MonitorTask::GetLastReadTime() {
+  auto seconds = _last_read_time_sec.load();
+  return uint32_time_point(uint32_seconds(seconds));
 }
 
-ConnectionChecker::~ConnectionChecker() {
-  _alive_check.Stop();
-  _alive_check.Join();
+MonitorTask::uint32_time_point MonitorTask::GetCurrentTime() {
+  return std::chrono::time_point_cast<MonitorTask::uint32_seconds>(std::chrono::steady_clock::now());
 }
 
-void ConnectionChecker::Init() {
-  _alive_check.Run(shared_from_this());
+void MonitorTask::UpdateLastReadTime() {
+ auto seconds = GetCurrentTime().time_since_epoch();
+ _last_read_time_sec.store(seconds.count());
 }
 
-void ConnectionChecker::SetState(ConnectionState new_state) {
-  if(_state != new_state) {
-    switch (new_state) {
-      case ConnectionState::NOT_CONNECTED:
-        break;
-      case ConnectionState::CONNECTED:
-        if(_state == NOT_CONNECTED)
-        break;
-      case ConnectionState::MAYBE_CONNECTED:
-        SendPing();
-        break;
-      default:
-        break;
-    }
-    _state = new_state;
+MonitorTask::MonitorTask(std::weak_ptr<Client> client, std::weak_ptr<MonitoringManager> manager, std::shared_ptr<ConnectionChecker> checker)
+    : _state(ConnectionState::CONNECTED)
+    , _port(-1)
+    , _client(client)
+    , _manager(manager)
+    , _checker(checker)
+    , _last_read_time_sec(0) {
+}
+
+MonitorTask::MonitorTask(const std::string& url, int port, std::weak_ptr<MonitoringManager> manager, std::shared_ptr<ConnectionChecker> checker)
+    : _state(ConnectionState::NOT_CONNECTED)
+    , _url(url)
+    , _port(port)
+    , _manager(manager)
+    , _checker(checker)
+    , _last_read_time_sec(0) {
+}
+
+bool MonitorTask::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
+  auto manager_sptr = _manager.lock();
+  if(!manager_sptr) {
+    return false;
+  }
+
+  client->SetManager(manager_sptr);
+  client->AddListener(shared_from_this());
+
+  if(err != NetError::OK) {
+    SetState(ConnectionState::NOT_CONNECTED);
+    return manager_sptr->OnClientConnecting(client, err);
+  }
+
+  if(manager_sptr->OnClientConnecting(client, err)) {
+   _client = client;
+   SetState(ConnectionState::CONNECTED);
+   return true;
+  }
+
+  SetState(ConnectionState::NOT_CONNECTED);
+  return false;
+}
+
+void MonitorTask::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
+  UpdateLastReadTime();
+}
+
+void MonitorTask::OnClientClosed(std::shared_ptr<Client> client) {
+  _client = {};
+}
+
+void MonitorTask::RequestCreatingClient() {
+  auto manager_sptr = _manager.lock();
+  if(manager_sptr) {
+    _client = {};
+    SetState(ConnectionState::CONNECTING);
+    manager_sptr->CreateClient(shared_from_this(), _url, _port);
   }
 }
 
-void ConnectionChecker::OnThreadStarted(int id){
-  while(_alive_check.ShouldRun()) {
-    switch (_state.load()) {
-      case ConnectionState::NOT_CONNECTED:
-      case ConnectionState::MAYBE_CONNECTED:
-        TryConnect();
-        break;
-      case ConnectionState::CONNECTED:
-        SetState(ConnectionState::MAYBE_CONNECTED);
-        break;
-      default:
-        break;
+void MonitorTask::SetState(ConnectionState new_state) {
+  _state.store(new_state);
+}
+
+bool MonitorTask::Check() {
+  auto manager_sptr = _manager.lock();
+  if(!manager_sptr) {
+    return false;
+  }
+
+  if(_port > -1) {
+    CheckForReconnectingClient();
+    return true;
+  }
+
+  return CheckForDisconnectingClient();
+}
+
+void MonitorTask::CheckForReconnectingClient() {
+  auto current_state = _state.load();
+  auto client_sptr = _client.lock();
+  auto manager_sptr = _manager.lock();
+
+  if(!client_sptr) {
+    if(current_state != ConnectionState::CONNECTING) {
+      RequestCreatingClient();
     }
-    std::this_thread::sleep_for(std::chrono::seconds(_check_interval_in_sec));
+    return;
+  }
+
+  auto time_since_read = GetCurrentTime() - GetLastReadTime();
+
+  if(time_since_read > INACTIVITY_TIME) {
+    if(current_state == ConnectionState::CONNECTED) {
+      SetState(ConnectionState::MAYBE_CONNECTED);
+      manager_sptr->SendPingToClient(client_sptr);
+      return;
+    } else if(current_state == ConnectionState::MAYBE_CONNECTED){
+      manager_sptr->OnClientUnresponsive(client_sptr);
+      RequestCreatingClient();
+    }
+  } else {
+    if(current_state != ConnectionState::CONNECTED) {
+      SetState(ConnectionState::CONNECTED);
+    }
   }
 }
 
-void ConnectionChecker::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
-  SetState(ConnectionState::CONNECTED);
-}
+bool MonitorTask::CheckForDisconnectingClient() {
+  auto current_state = _state.load();
+  auto client_sptr = _client.lock();
+  auto manager_sptr = _manager.lock();
 
-bool ConnectionChecker::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
+  if(!client_sptr) {
+    return false;
+  }
+
+  auto time_since_read = GetCurrentTime() - GetLastReadTime();
+
+  if(time_since_read > INACTIVITY_TIME) {
+    if(current_state == ConnectionState::CONNECTED) {
+      SetState(ConnectionState::MAYBE_CONNECTED);
+      manager_sptr->SendPingToClient(client_sptr);
+      return true;
+    } else if(current_state == ConnectionState::MAYBE_CONNECTED){
+      manager_sptr->OnClientUnresponsive(client_sptr);
+      _client = {};
+      return false;
+    }
+  } else {
+    if(current_state != ConnectionState::CONNECTED) {
+      SetState(ConnectionState::CONNECTED);
+    }
+  }
   return true;
 }
 
-void ConnectionChecker::OnClientConnected(std::shared_ptr<Client> client) {
-  _current_client = client;
-  SetState(ConnectionState::CONNECTED);
+ConnectionChecker::ConnectionChecker() {
+  _thread_loop = std::make_shared<ThreadLoop>();
+  _thread_loop->Init();
 }
 
-void ConnectionChecker::OnClientClosed(std::shared_ptr<Client> client) {
-  _current_client.reset();
-  SetState(ConnectionState::NOT_CONNECTED);
+void ConnectionChecker::Init() {
+  std::weak_ptr<ConnectionChecker> this_wptr = shared_from_this();
+  _thread_loop->Post(std::bind(&ConnectionChecker::MaybeCheckTasks, this_wptr), RECHECK_TIME, true);
 }
 
-void ConnectionChecker::TryConnect() {
-  if(_current_client) {
-    _current_client.reset();
-    SetState(ConnectionState::NOT_CONNECTED);
+std::shared_ptr<ConnectionChecker> ConnectionChecker::GetInstance() {
+  std::shared_ptr<ConnectionChecker> instance;
+  if(!(instance =_instance.lock())) {
+    instance.reset(new ConnectionChecker());
+    instance->Init();
+    _instance = instance;
   }
-
-  _connection->CreateClient(_server_port,
-                            _server_url,
-                            shared_from_this());
+  return instance;
 }
 
-void ConnectionChecker::SendPing() {
-  if(_current_client)
-    _current_client->Send(CreatePingMessage());
+void ConnectionChecker::MointorUrl(const std::string& url, int port, std::weak_ptr<MonitoringManager> owner) {
+  auto checker = ConnectionChecker::GetInstance();
+  auto task = std::make_shared<MonitorTask>(url, port, owner, checker);
+  task->RequestCreatingClient();
+  checker->AddTask(task);
 }
 
-std::shared_ptr<Client> ConnectionChecker::GetClient() {
-  return _current_client;
+void ConnectionChecker::MonitorClient(std::shared_ptr<Client> client, std::weak_ptr<MonitoringManager> owner) {
+  auto checker = ConnectionChecker::GetInstance();
+  auto task = std::make_shared<MonitorTask>(client, owner, checker);
+  client->AddListener(task);
+  checker->AddTask(task);
+}
+
+void ConnectionChecker::AddTask(std::shared_ptr<MonitorTask> task) {
+  if(_thread_loop->OnDifferentThread()) {
+    _thread_loop->Post(std::bind(&ConnectionChecker::AddTask, shared_from_this(), task));
+    return;
+  }
+  _tasks.push_back(task);
+}
+
+void ConnectionChecker::MaybeCheckTasks(std::weak_ptr<ConnectionChecker> instance) {
+  auto instance_sptr = instance.lock();
+  if(instance_sptr) {
+    instance_sptr->CheckTasks();
+  }
+}
+
+void ConnectionChecker::CheckTasks() {
+  for(auto it = _tasks.begin(); it != _tasks.end();) {
+    std::shared_ptr<MonitorTask> task = *it;
+    bool keep_task = task->Check();
+    if(!keep_task){
+      it = _tasks.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
