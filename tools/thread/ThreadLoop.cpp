@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "ThreadLoop.h"
+#include "DelayedTask.h"
 
 void ThreadLoop::Init() {
   _run_thread.Run(shared_from_this(), 0);
@@ -31,6 +32,12 @@ void ThreadLoop::Post(std::function<void()> request) {
   std::unique_lock<std::mutex> lock(_condition_mutex);
   _msgs.push(request);
   _condition.notify_one();
+}
+
+std::shared_ptr<DelayedTask> ThreadLoop::Post(std::function<void()> request,
+                                              std::chrono::milliseconds delay,
+                                              bool repeat) {
+  return DelayedTask::Create(request, shared_from_this(), delay, repeat);
 }
 
 bool ThreadLoop::OnDifferentThread() {

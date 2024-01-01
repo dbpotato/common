@@ -74,6 +74,7 @@ include_directories(
 )
 
 set(COMMON
+  ${COMMON_DIR}/tools/thread/DelayedTask.cpp
   ${COMMON_DIR}/tools/thread/PosixThread.cpp
   ${COMMON_DIR}/tools/thread/ThreadLoop.cpp
   ${COMMON_DIR}/tools/net/SocketContext.cpp

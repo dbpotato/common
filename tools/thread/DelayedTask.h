@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2023 Adam Kaniewski
+Copyright (c) 2023 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,29 +23,39 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <memory>
-#include <condition_variable>
-#include <queue>
-#include <chrono>
+
 
 #include "PosixThread.h"
 
-class DelayedTask;
+class ThreadLoop;
 
-class ThreadLoop : public std::enable_shared_from_this<ThreadLoop>
+class DelayedTask: public std::enable_shared_from_this<DelayedTask>
                  , public ThreadObject {
-public :
+
+friend class PosixThread;
+
+public:
+static std::shared_ptr<DelayedTask> Create(std::function<void()> post_function,
+        std::weak_ptr<ThreadLoop> post_target,
+        std::chrono::milliseconds delay,
+        bool repeat = false);
+void Cancel();
+protected:
+  DelayedTask(std::function<void()> post_function,
+              std::weak_ptr<ThreadLoop> post_target,
+              std::chrono::milliseconds delay,
+              bool repeat);
   void Init();
   void OnThreadStarted(int thread_id) override;
-  void Post(std::function<void()> request);
-  std::shared_ptr<DelayedTask> Post(std::function<void()> request,
-                                    std::chrono::milliseconds delay,
-                                    bool repeat = false);
-  bool OnDifferentThread();
+
 private:
+  std::function<void()> _post_function;
+  std::weak_ptr<ThreadLoop> _post_target;
+  std::chrono::milliseconds _delay;
+  bool _repeat;
   PosixThread _run_thread;
-  std::condition_variable _condition;
-  std::mutex _condition_mutex;
-  std::queue<std::function<void()>> _msgs;
+  std::shared_ptr<DelayedTask> _self;
 };
