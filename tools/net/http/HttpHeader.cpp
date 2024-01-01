@@ -55,6 +55,10 @@ HttpHeader::HttpHeader(HttpHeaderProtocol::Type protocol, HttpHeaderMethod::Type
   _request_target = request;
 }
 
+void HttpHeader::SetRequestTarget(const std::string& target) {
+  _request_target = target;
+}
+
 void HttpHeader::SetField(HttpHeaderField::Type type, const std::string& value) {
   auto it = _fields.find(type);
   if(it != _fields.end()) {

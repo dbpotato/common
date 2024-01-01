@@ -40,6 +40,7 @@ public:
 
   void Add(Data other_data);
   void Add(std::shared_ptr<Data> other_data);
+  void Add(uint32_t data_size, const unsigned char* data);
   uint32_t GetTotalSize();
   uint32_t GetCurrentSize();
   uint32_t GetOffset();
@@ -52,7 +53,8 @@ public:
   std::string ToString();
 
 protected:
-  uint32_t _size;
+  uint32_t _allocated_size;
+  uint32_t _used_size;
   uint32_t _offset;
   std::shared_ptr<unsigned char> _data;
 };

@@ -35,6 +35,7 @@ public :
   HttpHeader(HttpHeaderProtocol::Type protocol, int status_code);
   HttpHeader(HttpHeaderProtocol::Type protocol, HttpHeaderMethod::Type method, const std::string& request);
   static std::shared_ptr<HttpHeader> Parse(const std::string& header_str);
+  void SetRequestTarget(const std::string& target);
   void SetField(HttpHeaderField::Type type, const std::string& value);
   void SetField(const std::string& type, const std::string& value);
   void RemoveField(HttpHeaderField::Type type);

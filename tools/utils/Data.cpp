@@ -26,40 +26,47 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 Data::Data()
-    : _size(0), _offset(0) {
+    : _allocated_size(0)
+    , _used_size(0)
+    , _offset(0) {
 }
 
 Data::Data(const std::string& str)
-    : _size(str.length())
+    : _allocated_size(str.length())
+    , _used_size(str.length())
     , _offset(0) {
-  _data = std::shared_ptr<unsigned char>(new unsigned char[_size],
+  _data = std::shared_ptr<unsigned char>(new unsigned char[_allocated_size],
                                           std::default_delete<unsigned char[]>());
-  std::memcpy(_data.get(), str.c_str(), _size);
+  std::memcpy(_data.get(), str.c_str(), _allocated_size);
 }
 
 Data::Data(uint32_t size, std::shared_ptr<unsigned char> data)
-    : _size(size)
+    : _allocated_size(size)
+    , _used_size(size)
     , _offset(0)
     , _data(data) {
 }
 
 Data::Data(uint32_t size, const unsigned char* data)
-      : _size(size)
-      , _offset(0) {
-  _data = std::shared_ptr<unsigned char>(new unsigned char[_size],
+    : _allocated_size(size)
+    , _used_size(size)
+    , _offset(0) {
+  _data = std::shared_ptr<unsigned char>(new unsigned char[_allocated_size],
                                           std::default_delete<unsigned char[]>());
-  std::memcpy(_data.get(), data, _size);
+  std::memcpy(_data.get(), data, _allocated_size);
 }
 
 Data::Data(uint32_t size)
-    : _size(size)
+    : _allocated_size(size)
+    , _used_size(0)
     , _offset(0) {
-  _data = std::shared_ptr<unsigned char>(new unsigned char[_size],
+  _data = std::shared_ptr<unsigned char>(new unsigned char[_allocated_size],
                                           std::default_delete<unsigned char[]>());
 }
 
 void Data::Swap(std::shared_ptr<Data> data) {
-  _size = data->_size;
+  _allocated_size = data->_allocated_size;
+  _used_size = data->_used_size;
   _offset = data->_offset;
   _data = data->_data;
 }
@@ -77,29 +84,37 @@ void Data::Add(std::shared_ptr<Data> other_data) {
 }
 
 void Data::Add(Data other_data) {
-  uint32_t total_size = GetTotalSize();
-  uint32_t new_size = total_size + other_data.GetCurrentSize();
+  Add(other_data.GetCurrentSize(), other_data.GetCurrentDataRaw());
+}
+
+void Data::Add(uint32_t other_data_size, const unsigned char* other_data) {
+  uint32_t new_size = _used_size + other_data_size;
   if(!new_size) {
     return;
   }
 
-  auto new_data = std::shared_ptr<unsigned char>(new unsigned char[new_size],
+  if(new_size > _allocated_size) {
+    auto new_data = std::shared_ptr<unsigned char>(new unsigned char[new_size],
                                            std::default_delete<unsigned char[]>());
+    if(_used_size) {
+      std::memcpy(new_data.get(), _data.get(), _used_size);
+    }
+    _allocated_size = new_size;
+    _data = new_data;
+  }
 
-  std::memcpy(new_data.get(), _data.get(), _size);
-  std::memcpy(new_data.get() + _size,
-              other_data.GetCurrentDataRaw(),
-              other_data.GetCurrentSize());
-  _size = new_size;
-  _data = new_data;
+  std::memcpy(_data.get() + _used_size,
+              other_data,
+              other_data_size);
+  _used_size = new_size;
 }
 
 uint32_t Data::GetTotalSize() {
-  return _size;
+  return _used_size;
 }
 
 uint32_t Data::GetCurrentSize() {
-  return _size - _offset;
+  return _used_size - _offset;
 }
 
 uint32_t Data::GetOffset() {
@@ -111,7 +126,7 @@ bool Data::AddOffset(uint32_t offset) {
 }
 
 bool Data::SetOffset(uint32_t offset) {
-  if(offset > _size) {
+  if(offset > _used_size) {
     DLOG(error, "Data: trying to set offset larger than data size");
     return false;
   }
@@ -120,11 +135,11 @@ bool Data::SetOffset(uint32_t offset) {
 }
 
 bool Data::SetCurrentSize(uint32_t size) {
-  if(size + _offset > _size) {
-    DLOG(error, "Data: trying to set size larger than original size");
+  if(size + _offset > _allocated_size) {
+    DLOG(error, "Data: trying to set size larger than allocated size");
     return false;
   }
-  _size = size + _offset;
+  _used_size = size + _offset;
   return true;
 }
 
@@ -136,12 +151,12 @@ unsigned char* Data::GetCurrentDataRaw() {
   return _data.get() + _offset;
 }
 
-bool Data::CopyTo(void* dest, uint32_t offset, uint32_t dest_size) {
-  if(GetCurrentSize() < dest_size + offset) {
+bool Data::CopyTo(void* dest, uint32_t offset, uint32_t dest_used_size) {
+  if(GetCurrentSize() < dest_used_size + offset) {
     DLOG(error, "Data: trying to copy more data than currently availabe");
     return false;
   }
-  std::memcpy(dest, GetCurrentDataRaw() + offset, dest_size);
+  std::memcpy(dest, GetCurrentDataRaw() + offset, dest_used_size);
   return true;
 }
 

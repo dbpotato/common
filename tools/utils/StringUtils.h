@@ -74,13 +74,31 @@ namespace StringUtils {
       last_pos = pos + delim.length();
       pos = str.find(delim, last_pos);
     }
-    if(last_pos < str.length()) {
+    if(last_pos < str.length() || !str.length()) {
        elements.push_back(str.substr(last_pos));
     }
     return elements;
-  };
+  }
 
-  static bool ToInt(const std::string &str, int& out_value, int base = 10){
+  static std::string Replace(const std::string &str,
+                            const std::string &old_string,
+                            const std::string &new_string,
+                            size_t max_replacements = 0) {
+    size_t counter = 0;
+    std::string result = str;
+    size_t pos = result.find(old_string);
+    while (pos != std::string::npos) {
+      result.replace(pos, old_string.length(), new_string);
+      if(++counter <= max_replacements || !max_replacements) {
+        pos = result.find(old_string, pos + new_string.length());
+      } else {
+        pos = std::string::npos;
+      }
+    }
+    return result;
+  }
+
+  static bool ToInt(const std::string &str, int& out_value, int base = 10) {
     try {
       out_value = std::stoi(str, nullptr, base);
     } catch (const std::invalid_argument& exc) {
@@ -91,7 +109,7 @@ namespace StringUtils {
     return true;
   }
 
-  static bool ToInt(const std::string &str, long& out_value, int base = 10){
+  static bool ToInt(const std::string &str, long& out_value, int base = 10) {
     try {
       out_value = std::stol(str, nullptr, base);
     } catch (const std::invalid_argument& exc) {
@@ -102,13 +120,46 @@ namespace StringUtils {
     return true;
   }
 
-  static bool ToInt(const std::string &str, long long &out_value, int base = 10){
+  static bool ToInt(const std::string &str, long long &out_value, int base = 10) {
     try {
       out_value = std::stoll(str, nullptr, base);
     } catch (const std::invalid_argument& exc) {
       return false;
     } catch (const std::out_of_range & exc) {
       return false;
+    }
+    return true;
+  }
+
+  static bool ParseUrl(const std::string& url,
+                      std::string& out_protocol,
+                      std::string& out_host,
+                      std::string& out_target,
+                      int& out_port) {
+
+    std::string host_target;
+    std::vector<std::string> split = StringUtils::Split(url, "://", 1);
+
+    if(split.size() == 2) {
+      out_protocol = split.at(0);
+      host_target = split.at(1);
+    } else {
+      host_target = url;
+    }
+
+    split = StringUtils::Split(host_target, "/", 1);
+    out_host = split.at(0);
+
+    std::vector<std::string> port_split = StringUtils::Split(out_host, ":", 1);
+    if(port_split.size() == 2) {
+      out_host = port_split.at(0);
+      if(!StringUtils::ToInt(port_split.at(1), out_port)) {
+        return false;
+      }
+    }
+
+    if(split.size() == 2) {
+      out_target += split.at(1);
     }
     return true;
   }
