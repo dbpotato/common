@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -134,11 +134,11 @@ bool MsgCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected
   _resource = std::make_shared<DataResource>(_enable_drive_cache);
   _header = HttpDataParser::FindContentDataHeader(data, out_expected_cut_size, header_err);
 
-  if(!_header) {
-    //not enough data;
-    return true;
-  } else if (header_err) {
+  if(header_err) {
     UpdateBuilderState(HttpMessageBuilder::BuilderState::HEADER_PARSE_FAILED);
+    return false;
+  } else if(!_header) {
+    //not enough data;
     return false;
   }
 

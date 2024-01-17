@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2021 - 2023 Adam Kaniewski
+Copyright (c) 2021 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -78,7 +78,14 @@ void HttpMessageBuilder::CreateMessage() {
     }
   }
 
-  _messages_to_send.push_back(std::make_shared<HttpMessage>(_msg_cutter->GetHeader(), resource));
+  auto header = _msg_cutter->GetHeader();
+
+  if(!header) {
+    DLOG(error, "HttpMessageBuilder::CreateMessage : Tried to create msg without header");
+    return;
+  }
+
+  _messages_to_send.push_back(std::make_shared<HttpMessage>(header, resource));
 }
 
 void HttpMessageBuilder::SetState(BuilderState state) {
