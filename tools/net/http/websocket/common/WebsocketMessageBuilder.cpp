@@ -37,7 +37,7 @@ void WebsocketMessageBuilder::SetState(BuilderState state) {
   _builder_state = state;
 }
 
-bool WebsocketMessageBuilder::AddData(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) {
+bool WebsocketMessageBuilder::OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) {
   if(!_msg_cutter->AddData(data)){
     return false;
   }

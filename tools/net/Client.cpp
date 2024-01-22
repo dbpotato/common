@@ -40,12 +40,10 @@ void ClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr
 }
 
 bool ClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
-  DLOG(warn, "ClientManager::OnClientConnecting : not implemented");
   return true;
 }
 
 void ClientManager::OnClientConnected(std::shared_ptr<Client> client) {
-  DLOG(warn, "ClientManager::OnClientConnected : not implemented");
 }
 
 void ClientManager::OnClientClosed(std::shared_ptr<Client> client) {
@@ -183,7 +181,7 @@ void Client::OnDataRead(std::shared_ptr<Data> data) {
 
   if(_msg_builder) {
     std::vector<std::shared_ptr<Message> > msgs;
-    if(!_msg_builder->AddData(data, msgs)) {
+    if(!_msg_builder->OnDataRead(data, msgs)) {
       manager->OnMsgBuilderError(SharedPtr());
       return;
     }

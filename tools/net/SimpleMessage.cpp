@@ -29,8 +29,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 SimpleMessage::Header::Header(uint8_t type, uint32_t size)
     : _type(type)
     , _size(size) {
-  _header_data = std::make_shared<Data>(sizeof(uint8_t), (const unsigned char*)&_type);
-  _header_data->Add(std::move(Data(sizeof(uint32_t), (const unsigned char*)&_size)));
+  _header_data = std::make_shared<Data>(5);
+  _header_data->Add(1, (const unsigned char*)&_type);
+  _header_data->Add(4, (const unsigned char*)&_size);
 }
 
 SimpleMessage::SimpleMessage(std::shared_ptr<Header> header, std::shared_ptr<DataResource> content)
@@ -88,11 +89,11 @@ void SimpleMessageBuilder::FindCutFooter(std::shared_ptr<Data> data) {
   _messages_to_send.emplace_back(std::make_shared<SimpleMessage>(_header, _resource));
 }
 
-bool SimpleMessageBuilder::AddData(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) {
+bool SimpleMessageBuilder::OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) {
   bool data_add_success = TapeCutter::AddData(data);
 
   if(!data_add_success) {
-    DLOG(error, "SimpleMessageBuilder::AddData Failed");
+    DLOG(error, "SimpleMessageBuilder::OnDataRead Failed");
     return false;
   }
 

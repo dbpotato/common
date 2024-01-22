@@ -23,6 +23,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+
+#include <string>
+
 #ifndef DISABLE_SPD_LOGGER
 
 #include <spdlog/spdlog.h>
@@ -204,7 +207,7 @@ protected:
       return recheck;
 
     auto sink = std::make_shared<func_sink>();
-    std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>(std::move(std::to_string(id)),
+    std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>(std::to_string(id),
                                              std::move(sink));
     if(additional_sink) {
       logger->sinks().push_back(additional_sink);

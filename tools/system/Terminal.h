@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,39 +23,41 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include "Data.h"
+#include "Epool.h"
+
+
 #include <memory>
 #include <unistd.h>
-#include <vector>
 
 
-class Data;
-class DataResource;
-class Message;
+class Terminal;
 
-class MessageWriteRequest {
+class TerminalListener {
 public:
-  std::shared_ptr<Message> _msg;
-  size_t _write_offset;
-  uint32_t _total_write;
-  MessageWriteRequest(std::shared_ptr<Message> msg);
+  virtual void OnTerminalRead(std::shared_ptr<Terminal> terminal, std::shared_ptr<Data> output) = 0;
+  virtual void OnTerminalEnd(std::shared_ptr<Terminal> terminal) = 0;
 };
 
-class MessageBuilder {
-public:
-  virtual bool OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) = 0;
-};
+class Terminal 
+    : public FdListener
+    , public std::enable_shared_from_this<Terminal> {
+public :
+  Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener);
+  ~Terminal();
+  bool Init();
+  uint32_t GetId();
+  void Write(const std::string& data);
+  bool Resize(int width, int height);
 
-class Message : public std::enable_shared_from_this<Message> {
-public:
-  Message();
-  Message(const std::string& str);
-  Message(std::shared_ptr<Data> data);
-  virtual std::shared_ptr<Data> GetDataSubset(size_t max_size, size_t offset);
-  std::shared_ptr<Data> GetData();
-protected:
-  std::shared_ptr<Data> CreateSubsetFromHeaderAndResource(std::shared_ptr<Data> header,
-                                                std::shared_ptr<DataResource> resource,
-                                                size_t max_size,
-                                                size_t offset);
-  std::shared_ptr<Data> _data;
+  //FdListener
+  int GetFd() override;
+  void OnFdReadReady() override;
+  void OnFdWriteReady() override;
+
+private :
+  uint32_t _id;
+  int _master_fd;
+  int _child_pid;
+  std::shared_ptr<TerminalListener> _listener;
 };

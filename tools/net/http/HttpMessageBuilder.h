@@ -56,7 +56,7 @@ public:
   };
 
   HttpMessageBuilder(bool enable_drive_cache = true);
-  bool AddData(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) override;
+  bool OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) override;
   void SetState(BuilderState state);
 
 private:

@@ -42,7 +42,7 @@ HttpMessageBuilder::HttpMessageBuilder(bool enable_drive_cache)
   _chunk_cutter = std::make_shared<ChunkCutter>(*this, enable_drive_cache);
 }
 
-bool HttpMessageBuilder::AddData(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) {
+bool HttpMessageBuilder::OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) {
   bool data_add_success = false;
 
   if(_mode == BodyTransferMode::CHUNKED) {

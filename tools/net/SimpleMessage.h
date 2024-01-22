@@ -63,7 +63,7 @@ private:
 
 class SimpleMessageBuilder : public MessageBuilder, public TapeCutter {
 public :
-  bool AddData(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) override;
+  bool OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) override;
   uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
   bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) override;
   void FindCutFooter(std::shared_ptr<Data> data) override;

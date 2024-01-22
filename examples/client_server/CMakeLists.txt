@@ -67,6 +67,7 @@ set(LIBS
 
 set(INCLUDE_DIR
   ${COMMON_DIR}/third_party/spdlog/include
+  ${COMMON_DIR}/tools/system
   ${COMMON_DIR}/tools/thread
   ${COMMON_DIR}/tools/logger
   ${COMMON_DIR}/tools/utils
@@ -76,15 +77,15 @@ set(INCLUDE_DIR
 )
 
 set(COMMON
+  ${COMMON_DIR}/tools/system/Epool.cpp
+  ${COMMON_DIR}/tools/system/PosixThread.cpp
   ${COMMON_DIR}/tools/thread/DelayedTask.cpp
-  ${COMMON_DIR}/tools/thread/PosixThread.cpp
   ${COMMON_DIR}/tools/thread/ThreadLoop.cpp
   ${COMMON_DIR}/tools/net/SocketContext.cpp
   ${COMMON_DIR}/tools/net/SocketObject.cpp
   ${COMMON_DIR}/tools/net/Client.cpp
   ${COMMON_DIR}/tools/net/Connection.cpp
   ${COMMON_DIR}/tools/net/ConnectThread.cpp
-  ${COMMON_DIR}/tools/net/Epool.cpp
   ${COMMON_DIR}/tools/net/Message.cpp
   ${COMMON_DIR}/tools/net/Server.cpp
   ${COMMON_DIR}/tools/utils/Data.cpp
