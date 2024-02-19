@@ -40,6 +40,7 @@ WebsocketMessage::WebsocketMessage(const std::string& str)
 WebsocketMessage::WebsocketMessage(std::shared_ptr<WebsocketHeader> header, std::shared_ptr<DataResource> resource)
     : _header (header)
     , _resource(resource) {
+  _header_bin_data = std::make_shared<Data>();
 }
 
 std::shared_ptr<WebsocketHeader> WebsocketMessage::GetHeader() {
@@ -51,6 +52,11 @@ std::shared_ptr<DataResource> WebsocketMessage::GetResource() {
 }
 
 std::shared_ptr<Data> WebsocketMessage::GetDataSubset(size_t max_size, size_t offset) {
+  if(!_header_bin_data) {
+    DLOG(error, "No header data");
+    return {};
+  }
+
   if(!_header_bin_data->GetTotalSize()) {
     _header_bin_data = _header->GetBinaryForm();
   }
