@@ -45,12 +45,12 @@ Terminal::~Terminal() {
   if(_child_pid > 0) {
     int res_kill = kill(_child_pid, SIGKILL);
     if(res_kill != 0) {
-      DLOG(error, "Terminal::~Terminal() : kill command failed : {}", res_kill);
+      DLOG(error, "kill command failed : {}", res_kill);
     }
     int status = 0;
     int res_wait = waitpid(_child_pid, &status, 0);
     if(res_wait != _child_pid) {
-      DLOG(info, "Terminal::~Terminal() waitpid failed : {}, status : {}", res_wait, status);
+      DLOG(info, "waitpid failed : {}, status : {}", res_wait, status);
     }
   }
 }
@@ -62,7 +62,7 @@ uint32_t Terminal::GetId() {
 bool Terminal::Init() {
   _child_pid= forkpty(&_master_fd, nullptr, nullptr, nullptr);
   if (_child_pid == -1) {
-	  DLOG(error, "Terminal : forkpty failed");
+	  DLOG(error, "forkpty failed");
 	  return false;
   }
 
@@ -85,7 +85,7 @@ int Terminal::GetFd() {
 bool Terminal::Resize(int width, int height) {
   struct winsize win_size = {(unsigned short int)height, (unsigned short int)width, 0, 0};
   if(ioctl(_master_fd, TIOCSWINSZ, &win_size) == -1) {
-    DLOG(error, "Terminal::Resize FAIL using row/col: {}/{}", width, height);
+    DLOG(error, "Resize failed using row/col: {}/{}", width, height);
     return false;
   }
   return true;
@@ -94,7 +94,7 @@ bool Terminal::Resize(int width, int height) {
 void Terminal::Write(const std::string& data) {
   ssize_t res = write(_master_fd, data.c_str(), data.length());
   if( res != (ssize_t)data.length()) {
-    DLOG(error, "Terminal::Write Failed");
+    DLOG(error, "Write Failed");
   }
 }
 

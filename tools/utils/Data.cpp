@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -127,7 +127,7 @@ bool Data::AddOffset(uint32_t offset) {
 
 bool Data::SetOffset(uint32_t offset) {
   if(offset > _used_size) {
-    DLOG(error, "Data: trying to set offset larger than data size");
+    DLOG(error, "trying to set offset larger than data size");
     return false;
   }
   _offset = offset;
@@ -136,7 +136,7 @@ bool Data::SetOffset(uint32_t offset) {
 
 bool Data::SetCurrentSize(uint32_t size) {
   if(size + _offset > _allocated_size) {
-    DLOG(error, "Data: trying to set size larger than allocated size");
+    DLOG(error, "trying to set size larger than allocated size");
     return false;
   }
   _used_size = size + _offset;
@@ -153,7 +153,7 @@ unsigned char* Data::GetCurrentDataRaw() {
 
 bool Data::CopyTo(void* dest, uint32_t offset, uint32_t dest_used_size) {
   if(GetCurrentSize() < dest_used_size + offset) {
-    DLOG(error, "Data: trying to copy more data than currently availabe");
+    DLOG(error, "trying to copy more data than currently availabe");
     return false;
   }
   std::memcpy(dest, GetCurrentDataRaw() + offset, dest_used_size);

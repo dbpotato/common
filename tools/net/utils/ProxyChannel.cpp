@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -65,7 +65,7 @@ void ProxyChannel::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<
 
 bool ProxyChannel::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
   if(err != NetError::OK) {
-    DLOG(warn, "ProxyChannel : failed to connect to host target");
+    DLOG(warn, "failed to connect to host target");
     _proxy->OnChannelClosed(shared_from_this());
     return false;
   } else {

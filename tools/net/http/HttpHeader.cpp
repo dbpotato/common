@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 -2023 Adam Kaniewski
+Copyright (c) 2022 -2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -149,18 +149,18 @@ std::shared_ptr<HttpHeader> HttpHeader::Parse(const std::string& header_str) {
 
   std::vector<std::string> header_lines = StringUtils::Split(header_str, "\r\n");
   if(!header_lines.size()) {
-    DLOG(warn, "HttpHeader::Parse : empty header");
+    DLOG(warn, "Parse : empty header");
     return {};
   }
 
   if(!new_header->ParseType(header_lines.at(0))) {
-    DLOG(warn,"HttpHeader::Parse : failed to parse message type : {}", header_lines.at(0));
+    DLOG(warn, "Parse : failed to parse message type : {}", header_lines.at(0));
     return {};
   }
 
   for(size_t i = 1; i < header_lines.size(); ++i) {
     if(!new_header->KeyValSplit(header_lines.at(i), key, value)) {
-      DLOG(warn, "HttpHeader::Parse : failed to split field line :{}", header_lines.at(i));
+      DLOG(warn, "Parse : failed to split field line :{}", header_lines.at(i));
       continue;
     }
     if(HttpHeaderField::GetTypeFromString(key, key_type)) {
@@ -255,7 +255,7 @@ std::string HttpHeader::ToString() {
                << _status_code << " "
                << str_status_code << "\r\n";
   } else {
-    DLOG(warn, "HttpHeader : failed to convert to string");
+    DLOG(warn, "Failed to convert header to string");
     return INVALID_HEADER_STR;
   }
 

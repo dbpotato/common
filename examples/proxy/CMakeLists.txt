@@ -71,6 +71,7 @@ include_directories(
 )
 
 set(COMMON
+  ${COMMON_DIR}/tools/logger/Logger.cpp
   ${COMMON_DIR}/tools/system/Epool.cpp
   ${COMMON_DIR}/tools/system/PosixThread.cpp
   ${COMMON_DIR}/tools/thread/DelayedTask.cpp

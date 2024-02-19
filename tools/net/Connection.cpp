@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2023 Adam Kaniewski
+Copyright (c) 2018 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -156,7 +156,7 @@ int Connection::CreateServerSocket(int port) {
   gai_res = getaddrinfo(nullptr, std::to_string(port).c_str(), &hints, &result);
 
   if (gai_res != 0) {
-    DLOG(error, "Connection::CreateSocket getaddrinfo: {}", gai_strerror(gai_res));
+    DLOG(error, "CreateSocket getaddrinfo: {}", gai_strerror(gai_res));
     freeaddrinfo(result);
     return -1;
   }
@@ -171,11 +171,11 @@ int Connection::CreateServerSocket(int port) {
 
     int reuse = 1;
     if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) == -1) {
-      DLOG(warn, "Connection::CreateSocket set SO_REUSEADDR fail");
+      DLOG(warn, "CreateSocket set SO_REUSEADDR fail");
     } else if(bind(sfd, rp->ai_addr, rp->ai_addrlen) == -1) {
-      DLOG(warn, "Connection::CreateSocket bind fail");
+      DLOG(warn, "CreateSocket bind fail");
     } else if(listen(sfd, SOC_LISTEN) == -1) {
-      DLOG(warn, "Connection::CreateSocket listen fail");
+      DLOG(warn, "CreateSocket listen fail");
     } else {
       break;
     }
@@ -187,7 +187,7 @@ int Connection::CreateServerSocket(int port) {
   freeaddrinfo(result);
 
   if(sfd < 0) {
-    DLOG(error, "Connection::CreateSocket fail");
+    DLOG(error, "CreateSocket fail");
     return sfd;
   }
 
@@ -207,7 +207,7 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
 
   int socket = accept(server->GetFd(), &client_addr, &client_addr_len);
   if(socket < 0) {
-    DLOG(warn, "Connection::Accept fail on socket : {}", server->GetFd());
+    DLOG(warn, "Accept fail on socket : {}", server->GetFd());
     return;
   }
 
@@ -222,7 +222,7 @@ void Connection::Accept(std::shared_ptr<SocketObject> obj) {
                          NI_NUMERICHOST | NI_NUMERICSERV);
 
   if(res != 0) {
-    DLOG(warn, "Connection::Accept getnameinfo fail");
+    DLOG(warn, "Accept getnameinfo fail");
   }
 
   client.reset(new Client(socket,

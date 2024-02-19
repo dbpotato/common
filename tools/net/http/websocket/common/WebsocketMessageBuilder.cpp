@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -68,7 +68,7 @@ bool WebsocketMessageBuilder::OnDataRead(std::shared_ptr<Data> data, std::vector
 }
 
 void WebsocketMessageBuilder::OnHeaderParseFailed() {
-  DLOG(error, "WebsocketMessageBuilder : Header Parse Failed");
+  DLOG(error, "Header Parse Failed");
 }
 
 std::shared_ptr<WebsocketMessage> WebsocketMessageBuilder::OnMessageData() {
@@ -82,7 +82,7 @@ std::shared_ptr<WebsocketMessage> WebsocketMessageBuilder::OnMessageFragmentComp
     _fragment_builder = std::unique_ptr<WebsocketFragmentBuilder>(builder);
   } else {
     if(_fragment_builder->AddFragment(_msg_cutter->GetResource())) {
-      DLOG(error, "WebsocketMessageBuilder : Add fragment to builder failed");
+      DLOG(error, "Add fragment to builder failed");
       return nullptr;
     }
   }

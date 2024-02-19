@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -35,7 +35,7 @@ bool WebsocketDataCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& ou
   out_expected_cut_size = 0;
   _header = WebsocketHeader::MaybeCreateFromRawData(data);
   if(!_header) {
-    DLOG(error, "WebsocketDataCutter: Failed to create websocket header");
+    DLOG(error, "Failed to create websocket header");
     _owner.SetState(WebsocketMessageBuilder::BuilderState::HEADER_PARSE_FAILED);
     return false;
   }

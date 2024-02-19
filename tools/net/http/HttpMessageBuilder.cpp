@@ -55,7 +55,7 @@ bool HttpMessageBuilder::OnDataRead(std::shared_ptr<Data> data, std::vector<std:
   }
 
   if(!data_add_success) {
-    DLOG(error, "HttpMessageBuilder::AddData Failed");
+    DLOG(error, "AddData Failed");
     return false;
   }
 
@@ -81,7 +81,7 @@ void HttpMessageBuilder::CreateMessage() {
   auto header = _msg_cutter->GetHeader();
 
   if(!header) {
-    DLOG(error, "HttpMessageBuilder::CreateMessage : Tried to create msg without header");
+    DLOG(error, "CreateMessage : Tried to create msg without header");
     return;
   }
 

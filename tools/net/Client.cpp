@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2023 Adam Kaniewski
+Copyright (c) 2018 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -36,7 +36,7 @@ void ClientManager::OnServerCreated(std::shared_ptr<Server> server) {
 }
 
 void ClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
-  DLOG(warn, "ClientManager::OnClientRead : not implemented");
+  DLOG(warn, "OnClientRead : not implemented");
 }
 
 bool ClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
@@ -53,7 +53,7 @@ void ClientManager::OnMsgSent(std::shared_ptr<Client> client, std::shared_ptr<Me
 }
 
 void ClientManager::OnMsgBuilderError(std::shared_ptr<Client> client) {
-  DLOG(warn, "ClientManager::OnMsgBuilderError - closing client");
+  DLOG(warn, "OnMsgBuilderError - closing client");
   OnClientClosed(client);
 }
 
@@ -115,16 +115,16 @@ int Client::GetPort() {
 
 bool Client::Send(std::shared_ptr<Message> msg) {
   if(!msg) {
-    DLOG(error, "Client::Send - message is null");
+    DLOG(error, "Send - message is null");
     return false;
   }
 
   if(!IsActive()) {
-    DLOG(error, "Client::Send - client is not active");
+    DLOG(error, "Send - client is not active");
     return false;
   }
   if(!_is_connected){
-    DLOG(error, "Client::Send - client is not connected");
+    DLOG(error, "Send - client is not connected");
     return false;
   }
 

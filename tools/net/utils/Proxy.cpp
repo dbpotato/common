@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -109,7 +109,7 @@ void Proxy::OnChannelClosed(std::shared_ptr<ProxyChannel> channel) {
   if(it != _channels.end()) {
     _channels.erase(it);
   } else {
-    DLOG(error, "Proxy : failed to find closed channel");
+    DLOG(error, "failed to find closed channel");
   }
   _channel_mutex.unlock();
 }

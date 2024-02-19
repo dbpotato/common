@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2019 - 2023 Adam Kaniewski
+Copyright (c) 2019 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -110,7 +110,7 @@ void SocketContext::GetAddrInfo(std::shared_ptr<Client> client) {
       return;
     }
     else {
-      DLOG(error, "SocketContext : getaddrinfo failed : {}", gai_strerror(res));
+      DLOG(error, "getaddrinfo failed : {}", gai_strerror(res));
       SetState(FAILED);
       return;
     }
@@ -127,7 +127,7 @@ void SocketContext::Connect(std::shared_ptr<Client> client) {
       fcntl(_socket_fd, F_SETFL, O_NONBLOCK);
     }
     else {
-      DLOG(error, "SocketContext: create socket failed");
+      DLOG(error, "create socket failed");
       SetState(FAILED);
       return;
     }
@@ -155,7 +155,7 @@ void SocketContext::Connect(std::shared_ptr<Client> client) {
     _info_next = _info_next->ai_next;
   }
   else {
-    DLOG(warn, "SocketContext: connect fail : {} : {} : {}",
+    DLOG(warn, "connect fail : {} : {} : {}",
          client->GetUrl(),
          client->GetPort(),
          strerror(errno));

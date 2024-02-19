@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -135,7 +135,7 @@ bool MtlsCppConfig::InitEntropy() {
                           nullptr,
                           0);
   if(err != 0) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_ctr_drbg_seed : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_ctr_drbg_seed : {}", GetErrorName(err));
     return false;
   }
   return true;
@@ -150,7 +150,7 @@ bool MtlsCppConfig::InitCerts(const std::string& key, const std::string& cert) {
                     mbedtls_ctr_drbg_random,
                     &_ctr_drbg);
   if(err) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_pk_parse_key : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_pk_parse_key : {}", GetErrorName(err));
     return false;
   }
 
@@ -158,12 +158,12 @@ bool MtlsCppConfig::InitCerts(const std::string& key, const std::string& cert) {
                             (const unsigned char*)cert.c_str(),
                             cert.length() + 1);
   if(err) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_x509_crt_parse : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_x509_crt_parse : {}", GetErrorName(err));
     return false;
   }
   err = mbedtls_ssl_conf_own_cert(&_ssl_conf, &_owned_cert, &_pk_context);
   if(err) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_ssl_conf_own_cert : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_ssl_conf_own_cert : {}", GetErrorName(err));
     return false;
   }
   return true;
@@ -174,7 +174,7 @@ bool MtlsCppConfig::InitCaChain(const std::string& ca_chain) {
                             (const unsigned char*)ca_chain.c_str(),
                             ca_chain.length() + 1);
   if(err) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_x509_crt_parse : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_x509_crt_parse : {}", GetErrorName(err));
     return false;
   }
 
@@ -188,7 +188,7 @@ bool MtlsCppConfig::InitConfig() {
                               MBEDTLS_SSL_TRANSPORT_STREAM,
                               MBEDTLS_SSL_PRESET_DEFAULT);
   if(err) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_ssl_config_defaults : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_ssl_config_defaults : {}", GetErrorName(err));
     return false;
   }
   mbedtls_ssl_conf_rng(&_ssl_conf, mbedtls_ctr_drbg_random, &_ctr_drbg);
@@ -243,7 +243,7 @@ bool MtlsCppSsl::Init(int socket_fd, std::shared_ptr<MtlsCppConfig> config) {
 bool MtlsCppSsl::SetHostname(const std::string& host_name) {
   int err = mbedtls_ssl_set_hostname(&_ssl_context, host_name.c_str());
   if(err) {
-    DLOG(error, "MtlsCppWrapper : Fail mbedtls_ssl_set_hostname : {}", GetErrorName(err));
+    DLOG(error, "Fail on mbedtls_ssl_set_hostname : {}", GetErrorName(err));
     return false;
   }
   return true;
@@ -253,7 +253,7 @@ NetError MtlsCppSsl::MakeHandshake(bool& out_verified) {
   int err = mbedtls_ssl_handshake(&_ssl_context);
   if(err) {
     if(err != MBEDTLS_ERR_SSL_WANT_READ && err != MBEDTLS_ERR_SSL_WANT_WRITE) {
-      DLOG(error, "MtlsCppWrapper : Socket : {}, Handshake FAILED : {}", 
+      DLOG(error, "Socket : {}, Handshake FAILED : {}",
             _net_context.fd,
             GetErrorName(err));
       return NetError::FAILED;
@@ -273,7 +273,7 @@ bool MtlsCppSsl::Read(void* dest, int dest_size, size_t& out_read_size) {
     out_read_size = 0;
     return true;
   } else if(read_value < 0) {
-    DLOG(warn, "MtlsCppWrapper : mbedtls_ssl_read FAILED : {}", GetErrorName(read_value));
+    DLOG(warn, "Fail on mbedtls_ssl_readb : {}", GetErrorName(read_value));
     return false;
   }
   out_read_size = (size_t)read_value;
@@ -288,7 +288,7 @@ bool MtlsCppSsl::Write(const void* buffer, int size, size_t& out_write_size) {
         result == MBEDTLS_ERR_SSL_WANT_WRITE ) {
       return true;
     } else {
-      DLOG(warn, "MtlsCppWrapper : mbedtls_ssl_write FAILED : {}", GetErrorName(result));
+      DLOG(warn, "Fail on mbedtls_ssl_write : {}", GetErrorName(result));
       return false;
     }
   }

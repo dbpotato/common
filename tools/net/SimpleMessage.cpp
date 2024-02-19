@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -93,7 +93,7 @@ bool SimpleMessageBuilder::OnDataRead(std::shared_ptr<Data> data, std::vector<st
   bool data_add_success = TapeCutter::AddData(data);
 
   if(!data_add_success) {
-    DLOG(error, "SimpleMessageBuilder::OnDataRead Failed");
+    DLOG(error, "OnDataRead Failed");
     return false;
   }
 

@@ -79,7 +79,7 @@ bool Epool::Init() {
   _epool_fd = epoll_create1(0);
 
   if (_epool_fd == -1) {
-    DLOG(error, "Epool::Init : epoll_create failed");
+    DLOG(error, "epoll_create failed");
     return false;
   }
 
@@ -96,7 +96,7 @@ bool Epool::Init() {
 bool Epool::CreateWakeFd() {
   _wake_up_fd = eventfd(0, EFD_SEMAPHORE | EFD_NONBLOCK);
   if(_wake_up_fd == -1) {
-    DLOG(error, "Epool : eventfd() failed");
+    DLOG(error, "eventfd() failed");
     return false;
   }
 
@@ -106,7 +106,7 @@ bool Epool::CreateWakeFd() {
   event.events = EPOLLIN;
 
   if (epoll_ctl(_epool_fd, EPOLL_CTL_ADD, _wake_up_fd, &event) == -1) {
-    DLOG(error, "Epoll : Failed to add wake_fd");
+    DLOG(error, "Failed to add wake_fd");
     return false;
   }
   return true;
@@ -115,14 +115,14 @@ bool Epool::CreateWakeFd() {
 void Epool::Wake() {
   uint64_t value = 1;
   if(write(_wake_up_fd, &value, sizeof(value)) != sizeof(value)) {
-    DLOG(error, "Epool::Wake failed");
+    DLOG(error, "Wake failed");
   }
 }
 
 void Epool::ClearWake() {
   uint64_t value = 0;
   if(read(_wake_up_fd, &value, sizeof(value)) <=0 ){
-    DLOG(error, "Epool::ClearWake failed");
+    DLOG(error, "ClearWake failed");
   }
 }
 
@@ -136,7 +136,7 @@ void Epool::AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read) {
   int fd = obj->GetFd();
   auto result = _listeners.insert(std::make_pair<int, FdListenerInfo>(std::move(obj->GetFd()), FdListenerInfo(obj)));
   if(!result.second) {
-    DLOG(error, "Epool::AddListener FAILED - Already exists : {}", fd);
+    DLOG(error, "AddListener FAILED - Already exists : {}", fd);
     return;
   }
   struct epoll_event event;
@@ -144,7 +144,7 @@ void Epool::AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read) {
   event.data.fd = fd;
 
   if (epoll_ctl(_epool_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
-    DLOG(error, "Epool::AddListener FAILED - EPOLL_CTL_ADD : {}", fd);
+    DLOG(error, "AddListener FAILED - EPOLL_CTL_ADD : {}", fd);
   }
 
   if(wait_for_read) {
@@ -191,7 +191,7 @@ void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
 
   auto listener_it = _listeners.find(fd);
   if(listener_it == _listeners.end()) {
-    DLOG(warn, "Epool::SetObservedEvent - listener not found : {}", fd);
+    DLOG(warn, "SetObservedEvent - listener not found : {}", fd);
     return;
   }
 
@@ -207,7 +207,7 @@ void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
   listener_it->second._event_flags = event.events;
 
   if (epoll_ctl(_epool_fd, EPOLL_CTL_MOD, fd, &event) == -1) {
-    DLOG(error, "Epool : EPOLL_CTL_MOD failed : {} : {} : {}", fd, current_flags, (uint32_t)event.events);
+    DLOG(error, "EPOLL_CTL_MOD failed : {} : {} : {}", fd, current_flags, (uint32_t)event.events);
   }
 }
 
@@ -236,14 +236,14 @@ void Epool::WaitForEvents() {
 void Epool::HandleFdEvent(int fd, int event) {
   auto listener_it =_listeners.find(fd);
   if(listener_it == _listeners.end()) {
-    DLOG(warn, "Epool::HandleFdEvent - Listener Object not found : {}", fd);
+    DLOG(warn, "HandleFdEvent - Listener Object not found : {}", fd);
     return;
   }
 
   auto wrapper = listener_it->second;
   auto obj = wrapper.lock();
   if(!obj) {
-    DLOG(warn, "Epool::HandleFdEvent  - Listener Object already released : {}", fd);
+    DLOG(warn, "HandleFdEvent  - Listener Object already released : {}", fd);
     RemoveListener(fd);
     return;
   }

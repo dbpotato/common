@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -47,7 +47,7 @@ SocketContextMtls::SocketContextMtls(SocketContext::State init_state, int socket
   _ssl_conf = server_context->GetSslConfing();
   _ssl = MtlsCppSsl::CreateSsl(socket_fd, _ssl_conf);
   if(!_ssl) {
-    DLOG(error, "SocketContextMtls : FAILED to create SSL");
+    DLOG(error, "FAILED to create SSL");
   }
 }
 
@@ -67,7 +67,7 @@ bool SocketContextMtls::SetSocket(int socket_fd, const std::string& host_name) {
   }
   _ssl = MtlsCppSsl::CreateSsl(socket_fd, _ssl_conf, host_name);
   if(!_ssl) {
-    DLOG(error, "SocketContextMtls : FAILED to create SSL");
+    DLOG(error, "FAILED to create SSL");
     return false;
   }
   return true;
@@ -128,7 +128,7 @@ bool ConnectionMTls::Init() {
   }
 
   if(_default_client_config && _default_client_config->IsServerConfig()) {
-    DLOG(error, "ConnectionMTls : creating instance with config for server");
+    DLOG(error, "Creating instance with config for server");
     return false;
   }
 

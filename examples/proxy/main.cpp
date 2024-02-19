@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -38,6 +38,10 @@ int main(int argc, char** args) {
     StringUtils::ToInt(args[1], listen_port);
     auto proxy = std::make_shared<Proxy>(listen_port, host_url, host_port);
     if(!proxy->Init()) {
+      log()->error("Faild to init proxy with :\n  Listen port : {}\n  Host url: {}\n  Host port: {}\n",
+                    listen_port,
+                    host_url,
+                    host_port);
       return 0;
     } else{
       log()->info("Proxy started");

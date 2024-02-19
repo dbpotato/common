@@ -150,7 +150,7 @@ bool MsgCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected
         UpdateBuilderState(HttpMessageBuilder::BuilderState::RECEIVING_CHUNKED);
         return true;
       } else {
-        DLOG(error, "MsgCutter::FindCutHeader : unkonwn transfer encoding {}", transfer_encoding);
+        DLOG(error, "FindCutHeader : unkonwn transfer encoding {}", transfer_encoding);
         return false;
       }
   }

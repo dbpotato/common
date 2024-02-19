@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -131,7 +131,7 @@ bool WebsocketServer::CheckForProtocolUpgradeRequest(std::shared_ptr<Client> cli
     std::string accept_hash = PrepareWebSocketAccept(websocket_key);
     SendHandshakeResponse(client, accept_hash);
   } else {
-    DLOG(warn, "WebsocketServer::OnUpgradeRequest : cant find SEC_WEBSOCKET_KEY :\n{}", http_header->ToString());
+    DLOG(warn, "OnUpgradeRequest : cant find SEC_WEBSOCKET_KEY :\n{}", http_header->ToString());
     return false;
   }
   return true;
