@@ -38,7 +38,8 @@ Terminal::Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener)
   : _id(id)
   , _master_fd(-1)
   , _child_pid(-1)
-  , _listener(listener) {
+  , _listener(listener)
+  , _read_enabled(true) {
 }
 
 Terminal::~Terminal() {
@@ -91,6 +92,11 @@ bool Terminal::Resize(int width, int height) {
   return true;
 }
 
+void Terminal::EnableRead(bool enable) {
+  _read_enabled.store(enable);
+  Epool::GetInstance()->SetListenerAwaitingRead(shared_from_this(), enable);
+}
+
 void Terminal::Write(const std::string& data) {
   ssize_t res = write(_master_fd, data.c_str(), data.length());
   if( res != (ssize_t)data.length()) {
@@ -108,7 +114,9 @@ void Terminal::OnFdReadReady() {
 
   buff->SetCurrentSize((uint32_t)read_val);
   _listener->OnTerminalRead(shared_from_this(), buff);
-  Epool::GetInstance()->SetListenerAwaitingRead(shared_from_this(), true);
+  if(_read_enabled.load()) {
+    Epool::GetInstance()->SetListenerAwaitingRead(shared_from_this(), true);
+  }
 }
 
 void Terminal::OnFdWriteReady() {

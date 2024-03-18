@@ -26,7 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Data.h"
 #include "Epool.h"
 
-
+#include <atomic>
 #include <memory>
 #include <unistd.h>
 
@@ -49,6 +49,7 @@ public :
   uint32_t GetId();
   void Write(const std::string& data);
   bool Resize(int width, int height);
+  void EnableRead(bool enable);
 
   //FdListener
   int GetFd() override;
@@ -60,4 +61,5 @@ private :
   int _master_fd;
   int _child_pid;
   std::shared_ptr<TerminalListener> _listener;
+  std::atomic_bool _read_enabled;
 };
