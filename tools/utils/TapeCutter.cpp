@@ -56,7 +56,11 @@ bool TapeCutter::AddData(std::shared_ptr<Data> data) {
 
     if(!_expected_cut_size) {
       OnEndFound(data);
-      return true;
+      if(!data->GetCurrentSize()) {
+        return true;
+      }
+      repeat = true;
+      continue;
     }
 
     if(_current_cut_size + data->GetCurrentSize() > _expected_cut_size) {
@@ -74,6 +78,7 @@ bool TapeCutter::AddData(std::shared_ptr<Data> data) {
     if(_current_cut_size == _expected_cut_size) {
       data->AddOffset(available_cut_data);
       OnEndFound(data);
+      repeat = true;
     }
 
     if(repeat) {
