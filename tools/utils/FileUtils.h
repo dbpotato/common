@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,6 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <stdio.h>
@@ -96,23 +97,23 @@ namespace FileUtils {
   }
 
   static bool DeleteFile(const std::string& file_path) {
-    return !unlink(file_path.c_str());
+    std::error_code err;
+    return std::filesystem::remove(file_path, err);
   }
 
   static bool CopyFile(const std::string& from, const std::string& to) {
-    std::ifstream in(from, std::ios::in | std::ios::binary);
-    if(!in.is_open()) {
-      return false;
-    }
-    std::ofstream out(to, std::ios::out | std::ios::binary);
-    if(!out.is_open()) {
-      return false;
-    }
-    out << in.rdbuf();
-    return true;
+    std::error_code err;
+    auto options = std::filesystem::copy_options::overwrite_existing;
+    return std::filesystem::copy_file(from, to, options, err);
   }
 
   static bool MoveFile(const std::string& from, const std::string& to) {
+    std::error_code err;
+    std::filesystem::rename(from, to, err);
+    if(!err.value()) {
+      return true;
+    }
+
     if(!CopyFile(from, to)) {
       return false;
     }

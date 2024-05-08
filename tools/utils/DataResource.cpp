@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -185,6 +185,10 @@ std::fstream& DataResource::GetDriveCache() {
 
 std::string DataResource::GetDriveCacheFileName() {
   return _cache_file_name;
+}
+
+bool DataResource::SaveToFile(std::filesystem::path& path) {
+  return SaveToFile(path.string());
 }
 
 bool DataResource::SaveToFile(std::string file_name) {

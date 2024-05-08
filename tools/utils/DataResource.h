@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Data.h"
 
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -48,6 +49,7 @@ public:
   std::fstream& GetDriveCache();
   std::string GetDriveCacheFileName();
   bool SaveToFile(std::string file_name);
+  bool SaveToFile(std::filesystem::path& path);
   void CopyToBuff(unsigned char* buff, size_t buff_size, size_t offset);
 protected:
   void SetCompletedSize(uint32_t size);

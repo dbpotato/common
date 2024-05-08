@@ -26,7 +26,7 @@ project(ProxyExample)
 
 set(CXX_FLAGS
  "-O2 \
- -std=gnu++11 \
+ -std=gnu++17 \
  -Wall \
  -Werror \
  -Wundef \
