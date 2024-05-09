@@ -42,7 +42,7 @@ public:
 class Terminal 
     : public FdListener
     , public std::enable_shared_from_this<Terminal> {
-public :
+public:
   Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener);
   ~Terminal();
   bool Init();
@@ -56,7 +56,8 @@ public :
   void OnFdReadReady() override;
   void OnFdWriteReady() override;
 
-private :
+private:
+  void SetTrermAttributes();
   uint32_t _id;
   int _master_fd;
   int _child_pid;
