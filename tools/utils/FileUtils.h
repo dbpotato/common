@@ -36,12 +36,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 namespace FileUtils {
   static bool FileExists(const std::string& file_path) {
-    std::ifstream stream(file_path, std::ios::binary | std::ios::ate);
-    if(!stream.is_open()) {
-      return false;
-    }
-    stream.close();
-    return true;
+    return std::filesystem::exists(file_path);
   }
 
   static bool ReadFile(const std::string& file_path,
