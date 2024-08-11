@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2021 Adam Kaniewski
+Copyright (c) 2018 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -52,6 +52,7 @@ public:
  int GetFd() override;
  void OnFdReadReady() override;
  void OnFdWriteReady() override;
+ void OnFdOperationError(bool is_epool_err) override;
 
 protected:
  int _socket_fd;

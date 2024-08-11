@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2023 Adam Kaniewski
+Copyright (c) 2018 - 2024 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "SocketObject.h"
 #include "Connection.h"
 #include "NetUtils.h"
+#include "Logger.h"
 
 
 SocketObject::SocketObject(int socket_fd,
@@ -54,6 +55,11 @@ void SocketObject::OnFdReadReady() {
 
 void SocketObject::OnFdWriteReady() {
   _connection->OnSocketWriteReady(shared_from_this());
+}
+
+void SocketObject::OnFdOperationError(bool is_epool_err) {
+  //should never be reached
+  DLOG(error, "SocketObject epool operation failed");
 }
 
 bool SocketObject::IsServerSocket() {

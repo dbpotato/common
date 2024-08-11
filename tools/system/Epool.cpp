@@ -22,9 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Epool.h"
-#include "Connection.h"
 #include "Logger.h"
-#include "SocketObject.h"
 #include "ThreadLoop.h"
 
 #include <cstring>
@@ -137,14 +135,19 @@ void Epool::AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read) {
   auto result = _listeners.insert(std::make_pair<int, FdListenerInfo>(std::move(obj->GetFd()), FdListenerInfo(obj)));
   if(!result.second) {
     DLOG(error, "AddListener FAILED - Already exists : {}", fd);
+    NotifyListenerOnError(obj, false);
     return;
   }
+
   struct epoll_event event;
   std::memset(&event, 0 , sizeof(epoll_event));
   event.data.fd = fd;
 
   if (epoll_ctl(_epool_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
     DLOG(error, "AddListener FAILED - EPOLL_CTL_ADD : {}", fd);
+    NotifyListenerOnError(obj, true);
+    _listeners.erase(fd);
+    return;
   }
 
   if(wait_for_read) {
@@ -208,6 +211,9 @@ void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
 
   if (epoll_ctl(_epool_fd, EPOLL_CTL_MOD, fd, &event) == -1) {
     DLOG(error, "EPOLL_CTL_MOD failed : {} : {} : {}", fd, current_flags, (uint32_t)event.events);
+    NotifyListenerOnError(fd, true);
+    _listeners.erase(fd);
+    return;
   }
 }
 
@@ -255,4 +261,24 @@ void Epool::HandleFdEvent(int fd, int event) {
   if(event & EPOLLOUT) {
     obj->OnFdWriteReady();
   }
+}
+
+void Epool::NotifyListenerOnError(int fd, bool is_epool_err) {
+  auto listener_it =_listeners.find(fd);
+  if(listener_it == _listeners.end()) {
+    DLOG(warn, "NotifyListenerOnError - Listener Object not found : {}", fd);
+    return;
+  }
+  auto wrapper = listener_it->second;
+  auto obj = wrapper.lock();
+  if(!obj) {
+    DLOG(warn, "NotifyListenerOnError  - Listener Object already released : {}", fd);
+    RemoveListener(fd);
+    return;
+  }
+  NotifyListenerOnError(obj, is_epool_err);
+}
+
+void Epool::NotifyListenerOnError(std::shared_ptr<FdListener> obj, bool is_epool_err) {
+  obj->OnFdOperationError(is_epool_err);
 }

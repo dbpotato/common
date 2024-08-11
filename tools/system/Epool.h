@@ -36,6 +36,7 @@ public :
   virtual int GetFd() = 0;
   virtual void OnFdReadReady() = 0;
   virtual void OnFdWriteReady() = 0;
+  virtual void OnFdOperationError(bool is_epool_err) = 0;
 };
 
 class FdListenerInfo {
@@ -69,6 +70,8 @@ private:
   void ClearWake();
   void WaitForEvents();
   void HandleFdEvent(int fd, int event);
+  void NotifyListenerOnError(int fd, bool is_epool_err);
+  void NotifyListenerOnError(std::shared_ptr<FdListener> obj, bool is_epool_err);
   int _epool_fd;
   int _wake_up_fd;
   std::map<int, FdListenerInfo> _listeners;
