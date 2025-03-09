@@ -53,7 +53,7 @@ WebsocketHeader::WebsocketHeader()
   _mask_key[0] = _mask_key[1] = _mask_key[2] = _mask_key[3] = 0;
 }
 
-WebsocketHeader::WebsocketHeader(OpCode code, uint32_t data_length)
+WebsocketHeader::WebsocketHeader(OpCode code, uint64_t data_length)
     : WebsocketHeader() {
   _opcode = (uint8_t)code;
   _final_payload_len = data_length;
@@ -151,7 +151,7 @@ bool WebsocketHeader::FindPayloadAndHeaderSize(std::shared_ptr<Data> data) {
     uint16_t longer_payload = 0;
     std::memcpy(&longer_payload, data->GetCurrentDataRaw() + START_SIZE, LONGER_PAYLOAD_SIZE);
     longer_payload = be16toh(longer_payload);
-    _final_payload_len = (uint32_t)longer_payload;
+    _final_payload_len = (uint64_t)longer_payload;
     payload_extra_size = LONGER_PAYLOAD_SIZE;
   } else if(_payload_len == 127) {
     if(data->GetCurrentSize() < START_SIZE + LONGEST_PAYLOAD_SIZE) {
@@ -161,10 +161,10 @@ bool WebsocketHeader::FindPayloadAndHeaderSize(std::shared_ptr<Data> data) {
     uint64_t longest_payload = 0;
     std::memcpy(&longest_payload, data->GetCurrentDataRaw() + START_SIZE, LONGEST_PAYLOAD_SIZE);
     longest_payload = be64toh(longest_payload);
-    _final_payload_len = (uint32_t)longest_payload;
+    _final_payload_len = (uint64_t)longest_payload;
     payload_extra_size = LONGEST_PAYLOAD_SIZE;
   } else {
-    _final_payload_len = (uint32_t)_payload_len;
+    _final_payload_len = (uint64_t)_payload_len;
   }
 
   _header_length = START_SIZE + payload_extra_size + (_mask ? MASK_KEY_SIZE : 0);

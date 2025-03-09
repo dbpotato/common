@@ -34,8 +34,8 @@ class DataResource;
 class WebsocketDataCutter : public TapeCutter {
 public:
   WebsocketDataCutter(WebsocketMessageBuilder& owner);
-  bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) override;
-  uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
+  bool FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) override;
+  uint64_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
   void FindCutFooter(std::shared_ptr<Data> data) override;
   std::shared_ptr<DataResource> GetResource();
   std::shared_ptr<WebsocketHeader> GetHeader();

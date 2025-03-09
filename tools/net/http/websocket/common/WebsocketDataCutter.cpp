@@ -31,7 +31,7 @@ WebsocketDataCutter::WebsocketDataCutter(WebsocketMessageBuilder& owner)
   : _owner(owner) {
 }
 
-bool WebsocketDataCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) {
+bool WebsocketDataCutter::FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) {
   out_expected_cut_size = 0;
   _header = WebsocketHeader::MaybeCreateFromRawData(data);
   if(!_header) {
@@ -48,7 +48,7 @@ bool WebsocketDataCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& ou
   return true;
 }
 
-uint32_t WebsocketDataCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
+uint64_t WebsocketDataCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
   if(_header->_mask) {
     auto buff = data->GetCurrentDataRaw();
     uint32_t size = data->GetCurrentSize();

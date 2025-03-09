@@ -26,12 +26,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Logger.h"
 
 
-SimpleMessage::Header::Header(uint8_t type, uint32_t size)
+SimpleMessage::Header::Header(uint8_t type, uint64_t size)
     : _type(type)
     , _size(size) {
-  _header_data = std::make_shared<Data>(5);
-  _header_data->Add(1, (const unsigned char*)&_type);
-  _header_data->Add(4, (const unsigned char*)&_size);
+  size_t header_size = sizeof(type) + sizeof(size);
+  _header_data = std::make_shared<Data>(header_size);
+  _header_data->Add(sizeof(type), (const unsigned char*)&_type);
+  _header_data->Add(sizeof(size), (const unsigned char*)&_size);
 }
 
 SimpleMessage::SimpleMessage(std::shared_ptr<Header> header, std::shared_ptr<DataResource> content)
@@ -60,20 +61,24 @@ std::shared_ptr<Data> SimpleMessage::GetDataSubset(size_t max_size, size_t offse
 
 
 
-uint32_t SimpleMessageBuilder::AddDataToCurrentCut(std::shared_ptr<Data> data) {
+uint64_t SimpleMessageBuilder::AddDataToCurrentCut(std::shared_ptr<Data> data) {
   _resource->AddData(data);
   return _resource->GetSize();
 }
 
-bool SimpleMessageBuilder::FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) {
-  if(data->GetCurrentSize() < 5) {
+bool SimpleMessageBuilder::FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) {
+  uint8_t type = 0;
+  uint64_t size = 0;
+
+  size_t header_size = sizeof(type) + sizeof(size);
+
+  if(data->GetCurrentSize() < header_size) {
     return true;
   }
 
-  uint8_t type = 0;
-  uint32_t size = 0;
-  data->CopyTo(&type, 0, 1);
-  data->CopyTo(&size, 1, 4);
+
+  data->CopyTo(&type, 0, sizeof(type));
+  data->CopyTo(&size, sizeof(type), sizeof(size));
 
   _header = std::make_shared<SimpleMessage::Header>(type, size);
   _resource = std::make_shared<DataResource>();
@@ -81,7 +86,7 @@ bool SimpleMessageBuilder::FindCutHeader(std::shared_ptr<Data> data, uint32_t& o
 
   out_expected_cut_size = size;
 
-  data->AddOffset(5);
+  data->AddOffset(header_size);
   return true;
 }
 

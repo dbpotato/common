@@ -33,13 +33,13 @@ public:
   TapeCutter();
   virtual bool AddData(std::shared_ptr<Data> data);
 protected:
-  virtual bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) = 0;
+  virtual bool FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) = 0;
   virtual void FindCutFooter(std::shared_ptr<Data> data) = 0;
-  virtual uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) = 0;
+  virtual uint64_t AddDataToCurrentCut(std::shared_ptr<Data> data) = 0;
 
   std::shared_ptr<Data> _unfinished_header;
-  uint32_t _expected_cut_size;
-  uint32_t _current_cut_size;
+  uint64_t _expected_cut_size;
+  uint64_t _current_cut_size;
 
 private:
   void Reset();

@@ -39,9 +39,9 @@ class SimpleMessage : public Message {
 public:
   class Header {
   public :
-    Header(uint8_t type, uint32_t size);
+    Header(uint8_t type, uint64_t size);
     uint8_t _type;
-    uint32_t _size;
+    uint64_t _size;
     std::shared_ptr<Data> _header_data;
   };
 
@@ -64,8 +64,8 @@ private:
 class SimpleMessageBuilder : public MessageBuilder, public TapeCutter {
 public :
   bool OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) override;
-  uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
-  bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) override;
+  uint64_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
+  bool FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) override;
   void FindCutFooter(std::shared_ptr<Data> data) override;
 private:
   std::shared_ptr<SimpleMessage::Header> _header;

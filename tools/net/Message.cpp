@@ -51,7 +51,7 @@ std::shared_ptr<Data> Message::GetData() {
 
 std::shared_ptr<Data> Message::GetDataSubset(size_t max_size, size_t offset) {
   std::shared_ptr<Data> result;
-  if(_data->GetCurrentSize() && (_data->GetCurrentSize() > (uint32_t)offset)) {
+  if(_data->GetCurrentSize() && (_data->GetCurrentSize() > (uint64_t)offset)) {
     result = Data::MakeShallowCopy(_data);
     result->AddOffset(offset);
     if(result->GetCurrentSize() > max_size) {
@@ -68,10 +68,10 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
   std::shared_ptr<Data> result = std::make_shared<Data>();
   size_t header_data_size = 0;
 
-  if((uint32_t)offset < header->GetCurrentSize()) {
+  if((uint64_t)offset < header->GetCurrentSize()) {
     auto buff = std::shared_ptr<unsigned char>(new unsigned char[max_size],
                                               std::default_delete<unsigned char[]>());
-    result = std::make_shared<Data>((uint32_t)max_size, buff);
+    result = std::make_shared<Data>((uint64_t)max_size, buff);
     header_data_size = header->GetCurrentSize() - offset;
     if(header_data_size > max_size) {
       header_data_size = max_size;
@@ -90,12 +90,12 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
 
   max_size -= header_data_size;
 
-  size_t resource_offset = 0;
+  uint64_t resource_offset = 0;
   if(offset > header->GetCurrentSize()) {
     resource_offset = offset - header->GetCurrentSize();
   }
 
-  size_t resource_cpy_size = resource->GetSize() - resource_offset;
+  uint64_t resource_cpy_size = resource->GetSize() - resource_offset;
   if(resource_cpy_size > max_size) {
     resource_cpy_size = max_size;
   }
@@ -107,7 +107,7 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
   } else {
     if(!header_data_size) {
       auto buff = std::shared_ptr<unsigned char>(new unsigned char[resource_cpy_size], std::default_delete<unsigned char[]>());
-      result = std::make_shared<Data>((uint32_t)resource_cpy_size, buff);
+      result = std::make_shared<Data>((uint64_t)resource_cpy_size, buff);
     } else {
       result->SetCurrentSize(header_data_size + resource_cpy_size);
     }

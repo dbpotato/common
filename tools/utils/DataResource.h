@@ -41,9 +41,9 @@ public:
   bool AddData(std::shared_ptr<DataResource> resource);
   bool UseDriveCache();
   bool IsCompleted();
-  uint32_t GetSize();
-  uint32_t GetExpectedSize();
-  void SetExpectedSize(uint32_t expected_size);
+  uint64_t GetSize();
+  uint64_t GetExpectedSize();
+  void SetExpectedSize(uint64_t expected_size);
   std::shared_ptr<Data> GetMemCache();
   std::shared_ptr<Data> GetLastRecivedData();
   std::fstream& GetDriveCache();
@@ -52,11 +52,11 @@ public:
   bool SaveToFile(std::filesystem::path& path);
   void CopyToBuff(unsigned char* buff, size_t buff_size, size_t offset);
 protected:
-  void SetCompletedSize(uint32_t size);
+  void SetCompletedSize(uint64_t size);
 private:
   bool WriteToDrive(std::shared_ptr<Data> data);
-  uint32_t _loaded_size;
-  uint32_t _expected_size;
+  uint64_t _loaded_size;
+  uint64_t _expected_size;
   bool _enable_drive_cache;
   std::shared_ptr<Data> _last_received_data;
   std::shared_ptr<Data> _mem_cached_data;

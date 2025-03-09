@@ -30,8 +30,8 @@ class HttpHeader;
 class HttpDataParser {
 public:
   static std::shared_ptr<HttpHeader> FindContentDataHeader(std::shared_ptr<Data> data,
-                                                          uint32_t& out_expected_cut_size,
+                                                          uint64_t& out_expected_cut_size,
                                                           bool& header_err);
-  static bool FindChunkDataHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size);
+  static bool FindChunkDataHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size);
   static bool FindChunkDataFooter(std::shared_ptr<Data> data);
 };

@@ -55,6 +55,7 @@ public:
   int GetFd() override;
   void OnFdReadReady() override;
   void OnFdWriteReady() override;
+  void OnFdOperationError(bool is_epool_err) override;
 
 private:
   void SetTrermAttributes();

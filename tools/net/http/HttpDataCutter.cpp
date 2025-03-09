@@ -43,7 +43,7 @@ ChunkCutter::ChunkCutter(HttpMessageBuilder& owner, bool enable_drive_cache)
     , _joined_chunks(std::make_shared<DataResource>()) {
 }
 
-uint32_t ChunkCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
+uint64_t ChunkCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
   if(!_current_cut) {
     _current_cut = std::make_shared<DataResource>();
   }
@@ -51,7 +51,7 @@ uint32_t ChunkCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
   return _current_cut->GetSize();
 }
 
-bool ChunkCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) {
+bool ChunkCutter::FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) {
   if(_pending_footer) {
     data->AddOffset(CHUNK_SEPARATOR_SIZE);
     _pending_footer = false;
@@ -106,7 +106,7 @@ MsgCutter::MsgCutter(HttpMessageBuilder& owner, bool enable_drive_cache)
     , _enable_drive_cache(enable_drive_cache) {
 }
 
-uint32_t MsgCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
+uint64_t MsgCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
   _resource->AddData(data);
   if(_resource->IsCompleted()) {
     UpdateBuilderState(HttpMessageBuilder::BuilderState::MESSGAE_COMPLETED);
@@ -126,7 +126,7 @@ void MsgCutter::UpdateBuilderState(HttpMessageBuilder::BuilderState state) {
   }
 }
 
-bool MsgCutter::FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) {
+bool MsgCutter::FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) {
   UpdateBuilderState(HttpMessageBuilder::BuilderState::AWAITING_HEADER);
   bool header_err = false;
   std::string transfer_encoding;

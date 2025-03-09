@@ -32,8 +32,8 @@ class DataResource;
 class ChunkCutter : public TapeCutter {
 public:
   ChunkCutter(HttpMessageBuilder& owner, bool enable_drive_cache = true);
-  uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
-  bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) override;
+  uint64_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
+  bool FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) override;
   void FindCutFooter(std::shared_ptr<Data> data) override;
   std::shared_ptr<DataResource> GetResource();
 private:
@@ -48,8 +48,8 @@ private:
 class MsgCutter : public TapeCutter {
 public:
   MsgCutter(HttpMessageBuilder& owner, bool enable_drive_cache = true);
-  uint32_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
-  bool FindCutHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) override;
+  uint64_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
+  bool FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) override;
   void FindCutFooter(std::shared_ptr<Data> data) override;
   std::shared_ptr<HttpHeader> GetHeader();
   std::shared_ptr<DataResource> GetResource();

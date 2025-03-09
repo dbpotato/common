@@ -40,14 +40,14 @@ Data::Data(const std::string& str)
   std::memcpy(_data.get(), str.c_str(), _allocated_size);
 }
 
-Data::Data(uint32_t size, std::shared_ptr<unsigned char> data)
+Data::Data(uint64_t size, std::shared_ptr<unsigned char> data)
     : _allocated_size(size)
     , _used_size(size)
     , _offset(0)
     , _data(data) {
 }
 
-Data::Data(uint32_t size, const unsigned char* data)
+Data::Data(uint64_t size, const unsigned char* data)
     : _allocated_size(size)
     , _used_size(size)
     , _offset(0) {
@@ -56,7 +56,7 @@ Data::Data(uint32_t size, const unsigned char* data)
   std::memcpy(_data.get(), data, _allocated_size);
 }
 
-Data::Data(uint32_t size)
+Data::Data(uint64_t size)
     : _allocated_size(size)
     , _used_size(0)
     , _offset(0) {
@@ -87,8 +87,8 @@ void Data::Add(Data other_data) {
   Add(other_data.GetCurrentSize(), other_data.GetCurrentDataRaw());
 }
 
-void Data::Add(uint32_t other_data_size, const unsigned char* other_data) {
-  uint32_t new_size = _used_size + other_data_size;
+void Data::Add(uint64_t other_data_size, const unsigned char* other_data) {
+  uint64_t new_size = _used_size + other_data_size;
   if(!new_size) {
     return;
   }
@@ -109,23 +109,23 @@ void Data::Add(uint32_t other_data_size, const unsigned char* other_data) {
   _used_size = new_size;
 }
 
-uint32_t Data::GetTotalSize() {
+uint64_t Data::GetTotalSize() {
   return _used_size;
 }
 
-uint32_t Data::GetCurrentSize() {
+uint64_t Data::GetCurrentSize() {
   return _used_size - _offset;
 }
 
-uint32_t Data::GetOffset() {
+uint64_t Data::GetOffset() {
   return _offset;
 }
 
-bool Data::AddOffset(uint32_t offset) {
+bool Data::AddOffset(uint64_t offset) {
   return SetOffset(_offset + offset);
 }
 
-bool Data::SetOffset(uint32_t offset) {
+bool Data::SetOffset(uint64_t offset) {
   if(offset > _used_size) {
     DLOG(error, "trying to set offset larger than data size");
     return false;
@@ -134,7 +134,7 @@ bool Data::SetOffset(uint32_t offset) {
   return true;
 }
 
-bool Data::SetCurrentSize(uint32_t size) {
+bool Data::SetCurrentSize(uint64_t size) {
   if(size + _offset > _allocated_size) {
     DLOG(error, "trying to set size larger than allocated size");
     return false;
@@ -151,7 +151,7 @@ unsigned char* Data::GetCurrentDataRaw() {
   return _data.get() + _offset;
 }
 
-bool Data::CopyTo(void* dest, uint32_t offset, uint32_t dest_used_size) {
+bool Data::CopyTo(void* dest, uint64_t offset, uint64_t dest_used_size) {
   if(GetCurrentSize() < dest_used_size + offset) {
     DLOG(error, "trying to copy more data than currently availabe");
     return false;

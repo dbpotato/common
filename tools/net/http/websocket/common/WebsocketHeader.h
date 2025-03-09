@@ -41,7 +41,7 @@ public :
   };
 
   WebsocketHeader();
-  WebsocketHeader(OpCode code, uint32_t data_length = 0);
+  WebsocketHeader(OpCode code, uint64_t data_length = 0);
 
   static std::shared_ptr<WebsocketHeader> MaybeCreateFromRawData(std::shared_ptr<Data> data);
   void ParseFirstBytes(uint8_t header_start, uint8_t mask_with_payload);
@@ -60,7 +60,7 @@ public :
   uint8_t _opcode : 4;
   uint8_t _mask : 1;
   uint8_t _payload_len : 7;
-  uint32_t _final_payload_len; //payload with size greater than 32 bit is not supported
+  uint64_t _final_payload_len;
   uint8_t _mask_key[4];
 
   uint32_t _header_length;

@@ -36,7 +36,7 @@ class MessageWriteRequest {
 public:
   std::shared_ptr<Message> _msg;
   size_t _write_offset;
-  uint32_t _total_write;
+  uint64_t _total_write;
   MessageWriteRequest(std::shared_ptr<Message> msg);
 };
 

@@ -25,7 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "DataResource.h"
 #include "FileUtils.h"
 
-const uint32_t MAX_MEM_CACHE_SIZE = 1024*1024*4;
+const uint64_t MAX_MEM_CACHE_SIZE = 1024*1024*4;
 
 
 DataResource::DataResource(bool enable_drive_cache)
@@ -58,14 +58,18 @@ std::shared_ptr<DataResource> DataResource::CreateFromFile(std::string file_name
   }
 
   stream.seekg(0, std::ios::end);
-  uint32_t size = (uint32_t)stream.tellg();
+  auto stream_end = stream.tellg();
+  if(stream_end == -1) {
+    return nullptr;
+  }
+  uint64_t size = (uint64_t)stream_end;
   stream.seekg(0, std::ios::beg);
   result->SetCompletedSize(size);
 
   return result;
 }
 
-void DataResource::SetCompletedSize(uint32_t size) {
+void DataResource::SetCompletedSize(uint64_t size) {
   _loaded_size = _expected_size = size;
 }
 
@@ -73,15 +77,15 @@ bool DataResource::IsCompleted() {
   return (_loaded_size == _expected_size);
 }
 
-uint32_t DataResource::GetSize() {
+uint64_t DataResource::GetSize() {
   return _loaded_size;
 }
 
-uint32_t DataResource::GetExpectedSize() {
+uint64_t DataResource::GetExpectedSize() {
   return _expected_size;
 }
 
-void DataResource::SetExpectedSize(uint32_t expected_size) {
+void DataResource::SetExpectedSize(uint64_t expected_size) {
   _expected_size = expected_size;
 }
 
@@ -140,7 +144,7 @@ bool DataResource::AddData(std::shared_ptr<DataResource> resource) {
     res_stream.seekg(0, res_stream.beg);
 
     size_t buff_length = 1024*64;
-    char buff[buff_length];
+    char* buff = new char[buff_length];
 
     do {
       size_t read_len = buff_length;
@@ -150,6 +154,8 @@ bool DataResource::AddData(std::shared_ptr<DataResource> resource) {
       }
       _drive_cached_data.write(buff, read_len);
     } while(res_stream);
+
+    delete[] buff;
 
   } else {
     AddData(resource->GetMemCache());

@@ -33,7 +33,7 @@ const int MIN_CHUNK_HEADER_SIZE = 3; // "0\r\n"
 const int HEADER_END_SIZE = 4; // "\r\n\r\n"
 
 
-std::shared_ptr<HttpHeader> HttpDataParser::FindContentDataHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size, bool& header_err) {
+std::shared_ptr<HttpHeader> HttpDataParser::FindContentDataHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size, bool& header_err) {
   out_expected_cut_size = 0;
   header_err = false;
   std::shared_ptr<HttpHeader> header;
@@ -57,13 +57,13 @@ std::shared_ptr<HttpHeader> HttpDataParser::FindContentDataHeader(std::shared_pt
         DLOG(error, "Cant convert to int http body size : {}", content_len_val_str);
         header_err = true;
       }
-      out_expected_cut_size = (uint32_t) content_len;
+      out_expected_cut_size = (uint64_t) content_len;
     }
   }
   return header;
 }
 
-bool HttpDataParser::FindChunkDataHeader(std::shared_ptr<Data> data, uint32_t& out_expected_cut_size) {
+bool HttpDataParser::FindChunkDataHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) {
   out_expected_cut_size = 0;
 
   if(data->GetCurrentSize() < MIN_CHUNK_HEADER_SIZE) {

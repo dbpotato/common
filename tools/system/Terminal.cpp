@@ -170,3 +170,6 @@ void Terminal::OnFdReadReady() {
 
 void Terminal::OnFdWriteReady() {
 }
+
+void Terminal::OnFdOperationError(bool is_epool_err) {
+}

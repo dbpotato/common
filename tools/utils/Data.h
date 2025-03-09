@@ -32,29 +32,29 @@ class Data {
 public:
   Data();
   Data(const std::string& str);
-  Data(uint32_t size, std::shared_ptr<unsigned char> data);
-  Data(uint32_t size, const unsigned char* data);
-  Data(uint32_t size);
+  Data(uint64_t size, std::shared_ptr<unsigned char> data);
+  Data(uint64_t size, const unsigned char* data);
+  Data(uint64_t size);
   void Swap(std::shared_ptr<Data> data);
   static std::shared_ptr<Data> MakeShallowCopy(std::shared_ptr<Data> data);
 
   void Add(Data other_data);
   void Add(std::shared_ptr<Data> other_data);
-  void Add(uint32_t data_size, const unsigned char* data);
-  uint32_t GetTotalSize();
-  uint32_t GetCurrentSize();
-  uint32_t GetOffset();
-  bool AddOffset(uint32_t offset);
-  bool SetOffset(uint32_t offset);
-  bool SetCurrentSize(uint32_t size);
+  void Add(uint64_t data_size, const unsigned char* data);
+  uint64_t GetTotalSize();
+  uint64_t GetCurrentSize();
+  uint64_t GetOffset();
+  bool AddOffset(uint64_t offset);
+  bool SetOffset(uint64_t offset);
+  bool SetCurrentSize(uint64_t size);
   const std::shared_ptr<unsigned char> GetData();
   unsigned char* GetCurrentDataRaw();
-  bool CopyTo(void* dest, uint32_t offset, uint32_t dest_size);
+  bool CopyTo(void* dest, uint64_t offset, uint64_t dest_size);
   std::string ToString();
 
 protected:
-  uint32_t _allocated_size;
-  uint32_t _used_size;
-  uint32_t _offset;
+  uint64_t _allocated_size;
+  uint64_t _used_size;
+  uint64_t _offset;
   std::shared_ptr<unsigned char> _data;
 };
