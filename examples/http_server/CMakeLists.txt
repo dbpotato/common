@@ -30,7 +30,6 @@ set(CXX_FLAGS
  -Wall \
  -Werror \
  -Wundef \
- -Wcast-align \
  -Wcast-qual \
  -Wno-unused \
  -Wno-delete-non-virtual-dtor"
@@ -121,6 +120,7 @@ include_directories(
 
 set(SERVER
   ${COMMON}
+  ${SRC_DIR}/FileListHtml.cpp
   ${SRC_DIR}/main.cpp
 )
 

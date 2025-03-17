@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2025 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include <algorithm>
+#include <iomanip>
 #include <locale>
 #include <sstream>
 #include <stdexcept>
@@ -163,4 +164,47 @@ namespace StringUtils {
     }
     return true;
   }
-};
+
+  static std::string UrlEncode(const std::string& url) {
+    std::ostringstream encode;
+    encode.fill('0');
+    encode << std::hex;
+
+    for (auto iter = url.begin(); iter != url.end(); ++iter) {
+      auto c = (*iter);
+      if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+        encode << c;
+        continue;
+      }
+
+      encode << std::uppercase;
+      encode << '%' << std::setw(2) << int((unsigned char) c);
+      encode << std::nouppercase;
+    }
+    return encode.str();
+  }
+
+  static std::string UrlDecode(const std::string& url) {
+    std::ostringstream decoded;
+    size_t url_len = url.length();
+    for (size_t pos = 0; pos < url_len; ++pos) {
+      auto c = url.at(pos);
+      switch(c) {
+        case '%':
+          if (pos < url_len -2 && url.at(pos + 1) && url.at(pos + 2)) {
+            char hs[] {url.at(pos + 1), url.at(pos + 2)};
+            decoded << static_cast<char>(strtol(hs, nullptr, 16));
+            pos += 2;
+          }
+          break;
+        case '+':
+          decoded << ' ';
+          break;
+        default:
+          decoded << c;
+      }
+    }
+    return decoded.str();
+  }
+
+};//namespace StringUtils

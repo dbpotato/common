@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2025 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,11 +22,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "Connection.h"
+#include "FileListHtml.h"
+#include "FileUtils.h"
 #include "HttpServer.h"
 #include "HttpMessage.h"
 #include "HttpHeader.h"
 #include "Logger.h"
-#include "FileUtils.h"
+
+#include <algorithm>
+#include <filesystem>
+#include <sstream>
 
 #ifdef ENABLE_SSL
 
@@ -39,15 +44,6 @@ using namespace MtlsCppWrapper;
 const static int HTTP_SERVER_PORT = 80;
 const static int HTTPS_SERVER_PORT = 443;
 
-const static std::string DEFAULT_INDEX_HTML = R"""(
-<!DOCTYPE html>
-<html>
-  <head>
-    <title>HttpServer Example</title>
-  </head>
-  <body>Hello World</body>
-</html>
-)""";
 
 const static std::string SERVER_CERT_FILE="server.crt";
 const static std::string SERVER_KEY_FILE="server.key";
@@ -57,6 +53,8 @@ const static bool USE_SSL = true;
 #else
 const static bool USE_SSL = false;
 #endif //ENABLE_SSL
+
+const static bool ENABLE_DIRECTORY_LISTING = true;
 
 bool LoadCerts(std::string& out_key, std::string& out_cert) {
   bool result = true;
@@ -76,7 +74,16 @@ public:
    * then HttpRequest::_handled value must be changed to 'true'
    */
   void Handle(HttpRequest& request) override;
+  HttpRequestHandlerImpl(const std::filesystem::path& html_dir);
+private :
+  std::filesystem::path _html_dir;
+  std::unique_ptr<FileListHtml> _file_list_html;
 };
+
+HttpRequestHandlerImpl::HttpRequestHandlerImpl(const std::filesystem::path& html_dir)
+    : _html_dir(html_dir) {
+  _file_list_html = std::make_unique<FileListHtml>(html_dir);
+}
 
 void HttpRequestHandlerImpl::Handle(HttpRequest& request) {
   auto request_header = request._request_msg->GetHeader();
@@ -87,39 +94,55 @@ void HttpRequestHandlerImpl::Handle(HttpRequest& request) {
     return;
   }
 
-  auto target = request_header->GetRequestTarget();
+  auto target = StringUtils::UrlDecode(request_header->GetRequestTarget());
   log()->info("Got Request for : {}", target);
 
-  if(!target.compare("/")) {
+  std::filesystem::path req_path = _html_dir;
+  req_path += target;
+  bool target_is_dir = std::filesystem::is_directory(req_path);
+
+
+  if(target_is_dir && ENABLE_DIRECTORY_LISTING) {
+    request._response_msg = std::make_shared<HttpMessage>(200, _file_list_html->CreateHtmlList(req_path));
+    return;
+  } else if(target_is_dir && !ENABLE_DIRECTORY_LISTING && !target.compare("/")) {
     //redirect to index.html
     request._response_msg = std::make_shared<HttpMessage>(301);
     request._response_msg->GetHeader()->SetField(HttpHeaderField::LOCATION, "/index.html");
     return;
+  } else if(target_is_dir) {
+    //send "page not found response"
+    request._response_msg = std::make_shared<HttpMessage>(404);
+    return;
+  }
+
+  auto msg = HttpMessage::CreateFromFile(_html_dir.string() + request_header->GetRequestTarget());
+  if(msg) {
+    request._response_msg = msg;
   } else {
-    auto msg = HttpMessage::CreateFromFile("." + request_header->GetRequestTarget());
-    if(msg) {
-      request._response_msg = msg;
-    } else {
-      if(!target.compare("/index.html")) {
-        //send http document
-        request._response_msg = std::make_shared<HttpMessage>(200, DEFAULT_INDEX_HTML);
-      } else {
-        //send "page not found response"
-        request._response_msg = std::make_shared<HttpMessage>(404);
-      }
-    }
+    //send "page not found response"
+    request._response_msg = std::make_shared<HttpMessage>(404);
   }
 }
 
 int main(int argc, char** args) {
+
   int listen_port = USE_SSL ? HTTPS_SERVER_PORT: HTTP_SERVER_PORT;
-  if(argc == 2) {
+  std::filesystem::path html_dir = std::filesystem::current_path();
+  if(argc >= 2) {
     if(!StringUtils::ToInt(args[1], listen_port)) {
       log()->error("Can't parse server port : {}", args[1]); 
       return 1;
     }
   }
-
+  if(argc == 3) {
+    html_dir = std::filesystem::path(args[2]);
+    if(!std::filesystem::is_directory(html_dir)) {
+      log()->error("Invalid html dir : {}", args[2]);
+      return 1;
+    }
+  }
+  html_dir = std::filesystem::canonical(html_dir);
 
   std::shared_ptr<Connection> connection;
   std::shared_ptr<Server> server;
@@ -145,12 +168,16 @@ int main(int argc, char** args) {
   server = connection->CreateServer(listen_port, http_server);
 #endif //ENABLE_SSL
 
-  if(!http_server->Init(std::make_shared<HttpRequestHandlerImpl>(), server)) {
-    log()->error("Server failed to start at port : {}", listen_port);
+  if(!http_server->Init(std::make_shared<HttpRequestHandlerImpl>(html_dir), server)) {
+    log()->error("Server failed to start at port : {}, shared dir : {}",
+                  listen_port,
+                  html_dir.string());
     return 0;
   }
 
-  log()->info("Server started at port : {}", listen_port);
+  log()->info("Server started at port : {}, shared dir : {}",
+    listen_port,
+    html_dir.string());
 
   while(true)
     sleep(1);
