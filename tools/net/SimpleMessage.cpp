@@ -73,7 +73,7 @@ bool SimpleMessageBuilder::FindCutHeader(std::shared_ptr<Data> data, uint64_t& o
   size_t header_size = sizeof(type) + sizeof(size);
 
   if(data->GetCurrentSize() < header_size) {
-    return true;
+    return false;
   }
 
 
