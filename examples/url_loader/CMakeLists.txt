@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2025 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -21,10 +21,10 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ]]
 
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5)
 project(UrlLoaderExample)
 
-set(CXX_FLAGS
+set(DEFAULT_CXX_FLAGS
  "-O2 \
  -std=gnu++17 \
  -Wall \
@@ -39,7 +39,6 @@ set(CXX_FLAGS
 #add_definitions(-DENABLE_DEBUG_LOGGER)
 set(ENABLE_SSL false)
 
-set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
 set(CMAKE_SYSTEM_NAME linux)
 set(DEFAULT_CXX "g++")
 
@@ -59,6 +58,14 @@ else(DEFINED ENV{CXX})
   message("Using default compiler : " ${DEFAULT_CXX})
   set(CMAKE_CXX_COMPILER ${DEFAULT_CXX})
 endif(DEFINED ENV{CUSTOM_CXX})
+
+if(DEFINED ENV{CUSTOM_CXX_FLAGS})
+  message("Using user's CXX flags")
+  set(CMAKE_CXX_FLAGS $ENV{CUSTOM_CXX_FLAGS})
+else(DEFINED ENV{CXX})
+  message("Using default CXX flags")
+  set(CMAKE_CXX_FLAGS ${DEFAULT_CXX_FLAGS})
+endif(DEFINED ENV{CUSTOM_CXX_FLAGS})
 
 
 set(LIBS
