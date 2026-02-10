@@ -24,6 +24,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <iomanip>
 #include <locale>
 #include <sstream>
@@ -205,6 +206,15 @@ namespace StringUtils {
       }
     }
     return decoded.str();
+  }
+
+  static std::string TimestampToString(uint64_t epoch_time, const std::string& format = "%Y-%m-%d %H:%M:%S") {
+    std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(epoch_time);
+    std::time_t time_t_value = std::chrono::system_clock::to_time_t(tp);
+    std::tm tm_value = *std::localtime(&time_t_value);
+    std::ostringstream oss;
+    oss << std::put_time(&tm_value, format.c_str());
+    return oss.str();
   }
 
 };//namespace StringUtils

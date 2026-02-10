@@ -91,7 +91,7 @@ std::string FileListHtml::CreateLinkElement(const std::filesystem::path& path, c
     sstream << "<div class='icon file'>";
   }
   sstream << "</div><a href=\"/"
-          << StringUtils::UrlEncode(std::filesystem::relative(path, _html_dir).string())
+          << std::filesystem::relative(path, _html_dir).string()
           << "\">"
           << name
           << "</a></div>\n";

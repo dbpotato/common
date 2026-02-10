@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2023 Adam Kaniewski
+Copyright (c) 2018 - 2025 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -39,26 +39,23 @@ Message::Message() {
 }
 
 Message::Message(const std::string& str) {
-  _data = std::make_shared<Data>(str);
+  _data_resource = std::make_shared<DataResource>(std::make_shared<Data>(str));
 };
 
-Message::Message(std::shared_ptr<Data> data) : _data(data) {
+Message::Message(std::shared_ptr<Data> data) {
+  _data_resource = std::make_shared<DataResource>(data);
 };
 
-std::shared_ptr<Data> Message::GetData() {
-  return _data;
+Message::Message(std::shared_ptr<DataResource> data_resource)
+    : _data_resource(data_resource) {
+}
+
+std::shared_ptr<DataResource> Message::GetDataResource() {
+  return _data_resource;
 }
 
 std::shared_ptr<Data> Message::GetDataSubset(size_t max_size, size_t offset) {
-  std::shared_ptr<Data> result;
-  if(_data->GetCurrentSize() && (_data->GetCurrentSize() > (uint64_t)offset)) {
-    result = Data::MakeShallowCopy(_data);
-    result->AddOffset(offset);
-    if(result->GetCurrentSize() > max_size) {
-      result->SetCurrentSize(max_size);
-    }
-  }
-  return result;
+  return Message::CreateSubsetFromHeaderAndResource(nullptr, _data_resource, max_size, offset);
 }
 
 std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr<Data> header,
@@ -67,32 +64,36 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
                                                 size_t offset) {
   std::shared_ptr<Data> result = std::make_shared<Data>();
   size_t header_data_size = 0;
+  size_t header_current_size = 0;
 
-  if((uint64_t)offset < header->GetCurrentSize()) {
-    auto buff = std::shared_ptr<unsigned char>(new unsigned char[max_size],
-                                              std::default_delete<unsigned char[]>());
-    result = std::make_shared<Data>((uint64_t)max_size, buff);
-    header_data_size = header->GetCurrentSize() - offset;
-    if(header_data_size > max_size) {
-      header_data_size = max_size;
+  if(header) {
+    header_current_size = header->GetCurrentSize();
+    if((uint64_t)offset < header_current_size) {
+      auto buff = std::shared_ptr<unsigned char>(new unsigned char[max_size],
+                                                std::default_delete<unsigned char[]>());
+      result = std::make_shared<Data>((uint64_t)max_size, buff);
+      header_data_size = header_current_size - offset;
+      if(header_data_size > max_size) {
+        header_data_size = max_size;
+      }
+      std::memcpy(buff.get(), header->GetCurrentDataRaw(), header_data_size);
     }
-    std::memcpy(buff.get(), header->GetCurrentDataRaw(), header_data_size);
-  }
 
-  if(header_data_size == max_size) {
-    return result;
-  }
+    if(header_data_size == max_size) {
+      return result;
+    }
 
-  if(!resource || !resource->GetSize()) {
-    result->SetCurrentSize(header_data_size);
-    return result;
+    if(!resource || !resource->GetSize()) {
+      result->SetCurrentSize(header_data_size);
+      return result;
+    }
   }
 
   max_size -= header_data_size;
 
   uint64_t resource_offset = 0;
-  if(offset > header->GetCurrentSize()) {
-    resource_offset = offset - header->GetCurrentSize();
+  if(offset > header_current_size) {
+    resource_offset = offset - header_current_size;
   }
 
   uint64_t resource_cpy_size = resource->GetSize() - resource_offset;

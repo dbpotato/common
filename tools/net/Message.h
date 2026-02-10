@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2023 Adam Kaniewski
+Copyright (c) 2018 - 2025 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -50,12 +50,14 @@ public:
   Message();
   Message(const std::string& str);
   Message(std::shared_ptr<Data> data);
+  Message(std::shared_ptr<DataResource> data_resource);
+  std::shared_ptr<DataResource> GetDataResource();
   virtual std::shared_ptr<Data> GetDataSubset(size_t max_size, size_t offset);
-  std::shared_ptr<Data> GetData();
 protected:
   std::shared_ptr<Data> CreateSubsetFromHeaderAndResource(std::shared_ptr<Data> header,
                                                 std::shared_ptr<DataResource> resource,
                                                 size_t max_size,
                                                 size_t offset);
-  std::shared_ptr<Data> _data;
+private:
+  std::shared_ptr<DataResource> _data_resource;
 };

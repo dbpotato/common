@@ -56,7 +56,6 @@ public:
   std::shared_ptr<Data> GetDataSubset(size_t max_size, size_t offset) override;
 
 private:
-  using Message::GetData;
   std::shared_ptr<Header> _header;
   std::shared_ptr<DataResource> _content;
 };

@@ -23,15 +23,21 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #include "Terminal.h"
+#include "AsyncTask.h"
 #include "Data.h"
 #include "Logger.h"
+#include "StringUtils.h"
 
+#include <errno.h>
 #include <fcntl.h>
+#include <paths.h>
 #include <pty.h>
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <termios.h>
+#include <unistd.h>
+#include <utmp.h>
 
 
 const static int READ_BUFF_SIZE = 1024;
@@ -40,6 +46,7 @@ const static int READ_BUFF_SIZE = 1024;
 Terminal::Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener)
   : _id(id)
   , _master_fd(-1)
+  , _slave_fd(-1)
   , _child_pid(-1)
   , _listener(listener)
   , _read_enabled(true) {
@@ -63,10 +70,16 @@ uint32_t Terminal::GetId() {
   return _id;
 }
 
-bool Terminal::Init() {
-  _child_pid= forkpty(&_master_fd, nullptr, nullptr, nullptr);
+bool Terminal::Init(std::string shell_cmd) {
+  int res = openpty(&_master_fd, &_slave_fd, NULL, NULL, NULL);
+  if(res < 0) {
+    return false;
+  }
+
+  _child_pid= fork();
+
   if (_child_pid == -1) {
-	  DLOG(error, "forkpty failed");
+	  DLOG(error, "Fork failed");
 	  return false;
   }
 
@@ -74,10 +87,19 @@ bool Terminal::Init() {
     SetTrermAttributes();
 	  fcntl(_master_fd, F_SETFL, O_NONBLOCK);
     Epool::GetInstance()->AddListener(shared_from_this(), true);
+    AsyncTask::Create(std::bind(&Terminal::WaitForChildProcessEnd, shared_from_this()));
     return true;
   } else {
-    setsid();
-	  execlp("bash", "/bin/bash", NULL);
+    if(ConfigureSlavePty()) {
+      std::vector<std::string> split_vec = StringUtils::Split(shell_cmd, " ", 2);
+      if(split_vec.size() == 1) {
+        execlp(shell_cmd.c_str(), shell_cmd.c_str(), NULL);
+      } else if(split_vec.size() == 2) {
+        execlp(split_vec.at(0).c_str(), split_vec.at(0).c_str(), split_vec.at(1).c_str(), nullptr);
+      }
+    } else {
+      DLOG(error, "Failed to configure slave pty");
+    }
 	  exit(0);
   }
   return true;
@@ -86,6 +108,8 @@ bool Terminal::Init() {
 void Terminal::SetTrermAttributes() {
   //based on https://github.com/ovh/ovh-ttyrec/blob/master/ttyrec.c
 	struct termios mastert;
+  memset(&mastert, 0, sizeof(termios));
+
   if((tcgetattr(_master_fd, &mastert) == 0) && (mastert.c_lflag == 0)) {
     mastert.c_iflag = IXON + ICRNL;  // 02400
     mastert.c_oflag = OPOST + ONLCR; // 05
@@ -126,6 +150,55 @@ void Terminal::SetTrermAttributes() {
 #endif
     tcsetattr(_master_fd, TCSANOW, &mastert);
   }
+}
+
+bool Terminal::ConfigureSlavePty() {
+  close(_master_fd);
+  setsid();
+
+  for(int i = 0; i < 3; i++) {
+    if (i != _slave_fd) {
+      close (i);
+    }
+  }
+#ifdef TIOCSCTTY
+  if(ioctl(_slave_fd, TIOCSCTTY, nullptr) < 0) {
+    return false;
+  }
+#else
+  char *slave_name = nullptr;
+  int dummy_fd = 0;
+
+  slave_name = ttyname (_slave_fd);
+  if(slave_name == NULL) {
+    return false;
+  }
+  dummy_fd = open (slave_name, O_RDWR | O_CLOEXEC);
+  if(dummy_fd < 0) {
+    return false;
+  }
+  close(dummy_fd);
+#endif
+  for(int i = 0; i < 3; i++) {
+    if(_slave_fd != i) {
+      if(dup2(_slave_fd, i) < 0) {
+        return false;
+      }
+    }
+  }
+  if(_slave_fd >= 3) {
+    close(_slave_fd);
+  }
+  return true;
+}
+
+void Terminal::WaitForChildProcessEnd() {
+  int status = 0;
+
+  waitpid(_child_pid, &status, 0);
+
+  _child_pid = 0;
+  _listener->OnTerminalEnd(shared_from_this());
 }
 
 int Terminal::GetFd() {
