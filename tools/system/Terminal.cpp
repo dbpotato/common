@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 - 2024 Adam Kaniewski
+Copyright (c) 2023 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -66,6 +66,20 @@ Terminal::~Terminal() {
   }
 }
 
+void Terminal::WaitForChildProcessEnd(int child_pid, std::weak_ptr<Terminal> owner) {
+  int status = 0;
+  waitpid(child_pid, &status, 0);
+  auto terminal = owner.lock();
+  if(terminal) {
+    terminal->OnChildProcessEnded();
+  }
+}
+
+void Terminal::OnChildProcessEnded() {
+  _child_pid = 0;
+  _listener->OnTerminalEnd(shared_from_this());
+}
+
 uint32_t Terminal::GetId() {
   return _id;
 }
@@ -87,7 +101,8 @@ bool Terminal::Init(std::string shell_cmd) {
     SetTrermAttributes();
 	  fcntl(_master_fd, F_SETFL, O_NONBLOCK);
     Epool::GetInstance()->AddListener(shared_from_this(), true);
-    AsyncTask::Create(std::bind(&Terminal::WaitForChildProcessEnd, shared_from_this()));
+    std::weak_ptr<Terminal> weak_this = shared_from_this();
+    AsyncTask::Create(std::bind(&Terminal::WaitForChildProcessEnd, _child_pid, weak_this));
     return true;
   } else {
     if(ConfigureSlavePty()) {
@@ -190,15 +205,6 @@ bool Terminal::ConfigureSlavePty() {
     close(_slave_fd);
   }
   return true;
-}
-
-void Terminal::WaitForChildProcessEnd() {
-  int status = 0;
-
-  waitpid(_child_pid, &status, 0);
-
-  _child_pid = 0;
-  _listener->OnTerminalEnd(shared_from_this());
 }
 
 int Terminal::GetFd() {

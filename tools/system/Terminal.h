@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 - 2024 Adam Kaniewski
+Copyright (c) 2023 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -45,6 +45,7 @@ class Terminal
 public:
   Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener);
   ~Terminal();
+  static void WaitForChildProcessEnd(int child_pid, std::weak_ptr<Terminal> owner);
   bool Init(std::string shell_cmd);
   uint32_t GetId();
   void Write(const std::string& data);
@@ -57,10 +58,11 @@ public:
   void OnFdWriteReady() override;
   void OnFdOperationError(bool is_epool_err) override;
 
+protected:
+  void OnChildProcessEnded();
 private:
   void SetTrermAttributes();
   bool ConfigureSlavePty();
-  void WaitForChildProcessEnd();
   uint32_t _id;
   int _master_fd;
   int _slave_fd;
