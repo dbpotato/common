@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2024 Adam Kaniewski
+Copyright (c) 2024 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -31,6 +31,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 const static std::string HEADER = R"""(
 <!DOCTYPE html>
   <head>
+  <meta charset="utf-8" />
   <style>
     .icon {
       background-size: 100% 100% ;
@@ -91,7 +92,7 @@ std::string FileListHtml::CreateLinkElement(const std::filesystem::path& path, c
     sstream << "<div class='icon file'>";
   }
   sstream << "</div><a href=\"/"
-          << std::filesystem::relative(path, _html_dir).string()
+          << StringUtils::UrlEncode(std::filesystem::relative(path, _html_dir).string())
           << "\">"
           << name
           << "</a></div>\n";

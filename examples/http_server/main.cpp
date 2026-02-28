@@ -116,7 +116,7 @@ void HttpRequestHandlerImpl::Handle(HttpRequest& request) {
     return;
   }
 
-  auto msg = HttpMessage::CreateFromFile(_html_dir.string() + request_header->GetRequestTarget());
+  auto msg = HttpMessage::CreateFromFile(_html_dir.string() + target);
   if(msg) {
     request._response_msg = msg;
   } else {
