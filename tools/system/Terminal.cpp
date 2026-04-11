@@ -41,7 +41,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 const static int READ_BUFF_SIZE = 1024;
-
+const std::string TERM_ENV = "TERM";
 
 Terminal::Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener)
   : _id(id)
@@ -84,7 +84,7 @@ uint32_t Terminal::GetId() {
   return _id;
 }
 
-bool Terminal::Init(std::string shell_cmd) {
+bool Terminal::Init(const std::string& shell_cmd, const std::string& terminal_type) {
   int res = openpty(&_master_fd, &_slave_fd, NULL, NULL, NULL);
   if(res < 0) {
     return false;
@@ -98,14 +98,15 @@ bool Terminal::Init(std::string shell_cmd) {
   }
 
   if (_child_pid != 0) {
-    SetTrermAttributes();
-	  fcntl(_master_fd, F_SETFL, O_NONBLOCK);
+    fcntl(_master_fd, F_SETFL, O_NONBLOCK);
     Epool::GetInstance()->AddListener(shared_from_this(), true);
     std::weak_ptr<Terminal> weak_this = shared_from_this();
     AsyncTask::Create(std::bind(&Terminal::WaitForChildProcessEnd, _child_pid, weak_this));
     return true;
   } else {
     if(ConfigureSlavePty()) {
+      SetTrermAttributes();
+      setenv(TERM_ENV.c_str(), terminal_type.c_str(), true);
       std::vector<std::string> split_vec = StringUtils::Split(shell_cmd, " ", 2);
       if(split_vec.size() == 1) {
         execlp(shell_cmd.c_str(), shell_cmd.c_str(), NULL);
@@ -115,55 +116,55 @@ bool Terminal::Init(std::string shell_cmd) {
     } else {
       DLOG(error, "Failed to configure slave pty");
     }
-	  exit(0);
+    exit(0);
   }
   return true;
 }
 
 void Terminal::SetTrermAttributes() {
   //based on https://github.com/ovh/ovh-ttyrec/blob/master/ttyrec.c
-	struct termios mastert;
-  memset(&mastert, 0, sizeof(termios));
+  struct termios tc_attr;
+  memset(&tc_attr, 0, sizeof(termios));
 
-  if((tcgetattr(_master_fd, &mastert) == 0) && (mastert.c_lflag == 0)) {
-    mastert.c_iflag = IXON + ICRNL;  // 02400
-    mastert.c_oflag = OPOST + ONLCR; // 05
-    mastert.c_cflag = 0277;          //B38400 + CS8 + CREAD;
-    mastert.c_lflag = ISIG + ICANON + ECHO + ECHOE + ECHOK + IEXTEN;
+  if(tcgetattr(_slave_fd, &tc_attr) == 0) {
+    tc_attr.c_iflag = IXON + ICRNL;  // 02400
+    tc_attr.c_oflag = OPOST + ONLCR; // 05
+    tc_attr.c_cflag = 0277;          //B38400 + CS8 + CREAD;
+    tc_attr.c_lflag = ISIG + ICANON + ECHO + ECHOE + ECHOK + IEXTEN;
 #ifdef ECHOKE
-    mastert.c_lflag += ECHOKE;
+    tc_attr.c_lflag += ECHOKE;
 #endif
 #ifdef ECHOCTL
-    mastert.c_lflag += ECHOCTL;
+    tc_attr.c_lflag += ECHOCTL;
 #endif
     // apply the c_cc config of a classic pseudotty given by posix_openpt()
-    mastert.c_cc[VINTR] = 3;
-    mastert.c_cc[VQUIT] = 28;
-    mastert.c_cc[VERASE] = 127;
-    mastert.c_cc[VKILL] = 21;
-    mastert.c_cc[VEOF] = 4;
-    mastert.c_cc[VTIME] = 0;
-    mastert.c_cc[VMIN] = 1;
+    tc_attr.c_cc[VINTR] = 3;
+    tc_attr.c_cc[VQUIT] = 28;
+    tc_attr.c_cc[VERASE] = 127;
+    tc_attr.c_cc[VKILL] = 21;
+    tc_attr.c_cc[VEOF] = 4;
+    tc_attr.c_cc[VTIME] = 0;
+    tc_attr.c_cc[VMIN] = 1;
 #ifdef VSWTC
-    mastert.c_cc[VSWTC] = 0;
+    tc_attr.c_cc[VSWTC] = 0;
 #endif
-    mastert.c_cc[VSTART] = 17;
-    mastert.c_cc[VSTOP] = 19;
-    mastert.c_cc[VSUSP] = 26;
-    mastert.c_cc[VEOL] = 0;
+    tc_attr.c_cc[VSTART] = 17;
+    tc_attr.c_cc[VSTOP] = 19;
+    tc_attr.c_cc[VSUSP] = 26;
+    tc_attr.c_cc[VEOL] = 0;
 #ifdef VREPRINT
-    mastert.c_cc[VREPRINT] = 18;
+    tc_attr.c_cc[VREPRINT] = 18;
 #endif
 #ifdef VDISCARD
-    mastert.c_cc[VDISCARD] = 15;
+    tc_attr.c_cc[VDISCARD] = 15;
 #endif
 #ifdef VWERASE
-    mastert.c_cc[VWERASE] = 23;
+    tc_attr.c_cc[VWERASE] = 23;
 #endif
 #ifdef VLNEXT
-    mastert.c_cc[VLNEXT] = 22;
+    tc_attr.c_cc[VLNEXT] = 22;
 #endif
-    tcsetattr(_master_fd, TCSANOW, &mastert);
+    tcsetattr(_slave_fd, TCSANOW, &tc_attr);
   }
 }
 
@@ -171,11 +172,6 @@ bool Terminal::ConfigureSlavePty() {
   close(_master_fd);
   setsid();
 
-  for(int i = 0; i < 3; i++) {
-    if (i != _slave_fd) {
-      close (i);
-    }
-  }
 #ifdef TIOCSCTTY
   if(ioctl(_slave_fd, TIOCSCTTY, nullptr) < 0) {
     return false;
@@ -194,6 +190,17 @@ bool Terminal::ConfigureSlavePty() {
   }
   close(dummy_fd);
 #endif
+
+  if (tcsetpgrp(_slave_fd, getpid()) < 0) {
+    return false;
+  }
+
+  for(int i = 0; i < 3; i++) {
+    if (i != _slave_fd) {
+      close(i);
+    }
+  }
+
   for(int i = 0; i < 3; i++) {
     if(_slave_fd != i) {
       if(dup2(_slave_fd, i) < 0) {
@@ -201,6 +208,7 @@ bool Terminal::ConfigureSlavePty() {
       }
     }
   }
+
   if(_slave_fd >= 3) {
     close(_slave_fd);
   }

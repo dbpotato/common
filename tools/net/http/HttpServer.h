@@ -67,6 +67,8 @@ public:
   virtual void OnClientConnected(std::shared_ptr<Client> client) override;
   virtual void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
 
+  void RemoveClient(std::shared_ptr<Client> client);
+
 protected:
   virtual void ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg);
   void SendResponse(HttpRequest& req);

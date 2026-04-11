@@ -66,6 +66,10 @@ void HttpServer::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Me
   ProcessRequest(client, http_msg);
 }
 
+void HttpServer::RemoveClient(std::shared_ptr<Client> client) {
+  _server->RemoveClient(client);
+}
+
 void HttpServer::ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg) {
   HttpRequest request;
   request._request_msg = msg;

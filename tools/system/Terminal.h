@@ -46,7 +46,7 @@ public:
   Terminal(uint32_t id, std::shared_ptr<TerminalListener> listener);
   ~Terminal();
   static void WaitForChildProcessEnd(int child_pid, std::weak_ptr<Terminal> owner);
-  bool Init(std::string shell_cmd);
+  bool Init(const std::string& shell_cmd, const std::string& terminal_type);
   uint32_t GetId();
   void Write(const std::string& data);
   bool Resize(int width, int height);

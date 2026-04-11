@@ -87,6 +87,8 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
       result->SetCurrentSize(header_data_size);
       return result;
     }
+  } else if(!resource) {
+    return result;
   }
 
   max_size -= header_data_size;
