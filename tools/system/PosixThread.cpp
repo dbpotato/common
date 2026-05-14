@@ -42,9 +42,9 @@ void PosixThread::InternalStartThread() {
   if((_thread_obj_lock = _thread_obj.lock())) {
     _thread_obj_lock->OnThreadStarted(_id);
   }
-  _thread_obj_lock = nullptr;
   _is_running = false;
   _should_run = false;
+  _thread_obj_lock = nullptr;
 }
 
 bool PosixThread::Run(std::weak_ptr<ThreadObject> obj, int id) {

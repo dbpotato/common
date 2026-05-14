@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2025 Adam Kaniewski
+Copyright (c) 2018 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -42,12 +42,14 @@ public:
 
 class MessageBuilder {
 public:
+  virtual ~MessageBuilder() {};
   virtual bool OnDataRead(std::shared_ptr<Data> data, std::vector<std::shared_ptr<Message> >& out_msgs) = 0;
 };
 
 class Message : public std::enable_shared_from_this<Message> {
 public:
   Message();
+  virtual ~Message(){};
   Message(const std::string& str);
   Message(std::shared_ptr<Data> data);
   Message(std::shared_ptr<DataResource> data_resource);

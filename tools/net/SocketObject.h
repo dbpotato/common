@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2024 Adam Kaniewski
+Copyright (c) 2018 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "Epool.h"
 
+#include <atomic>
 #include <memory>
 
 class Connection;
@@ -57,7 +58,7 @@ public:
 protected:
  int _socket_fd;
  bool _is_server_socket;
- bool _is_active;
+ std::atomic_bool _is_active;
  bool _was_fd_closed;
  std::shared_ptr<Connection> _connection;
  std::shared_ptr<SocketContext> _context;
