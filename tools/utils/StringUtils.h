@@ -133,6 +133,17 @@ namespace StringUtils {
     return true;
   }
 
+  static bool ToFloat(const std::string &str, float &out_value) {
+    try {
+      out_value = std::stof(str);
+    } catch (const std::invalid_argument& exc) {
+      return false;
+    } catch (const std::out_of_range & exc) {
+      return false;
+    }
+    return true;
+  }
+
   static bool ParseUrl(const std::string& url,
                       std::string& out_protocol,
                       std::string& out_host,
