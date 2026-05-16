@@ -23,7 +23,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "ProxyPipe.h"
 #include "Logger.h"
-#include "ThreadLoop.h
+#include "ThreadLoop.h"
 
 
 const uint32_t DEFAULT_STOP_READ = 32;
