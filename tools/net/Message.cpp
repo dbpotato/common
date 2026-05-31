@@ -62,9 +62,27 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
                                                 std::shared_ptr<DataResource> resource,
                                                 size_t max_size,
                                                 size_t offset) {
+  bool contain_resource_data = false;
+  uint64_t resource_data_offset = 0;
+  return CreateSubsetFromHeaderAndResource(header,
+                                        resource,
+                                        max_size,
+                                        offset,
+                                        contain_resource_data,
+                                        resource_data_offset);
+}
+
+std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr<Data> header,
+                                                std::shared_ptr<DataResource> resource,
+                                                size_t max_size,
+                                                size_t offset,
+                                                bool& out_contain_resource_data,
+                                                uint64_t& out_resource_data_offset) {
   std::shared_ptr<Data> result = std::make_shared<Data>();
   size_t header_data_size = 0;
   size_t header_current_size = 0;
+  out_contain_resource_data = false;
+  out_resource_data_offset = 0;
 
   if(header) {
     header_current_size = header->GetCurrentSize();
@@ -90,6 +108,9 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
   } else if(!resource) {
     return result;
   }
+
+  out_contain_resource_data = true;
+  out_resource_data_offset = header_data_size;
 
   max_size -= header_data_size;
 

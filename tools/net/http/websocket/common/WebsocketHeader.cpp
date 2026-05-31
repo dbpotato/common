@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,6 +26,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <bitset>
 #include <endian.h>
+#include <random>
 
 
 const int START_SIZE = 2;
@@ -53,10 +54,19 @@ WebsocketHeader::WebsocketHeader()
   _mask_key[0] = _mask_key[1] = _mask_key[2] = _mask_key[3] = 0;
 }
 
-WebsocketHeader::WebsocketHeader(OpCode code, uint64_t data_length)
+WebsocketHeader::WebsocketHeader(OpCode code, uint64_t data_length, bool masked)
     : WebsocketHeader() {
   _opcode = (uint8_t)code;
   _final_payload_len = data_length;
+  _mask = masked ? 1 : 0;
+
+  if (_mask) {
+    std::random_device rd;
+    for (int i = 0; i < MASK_KEY_SIZE; ++i) {
+      _mask_key[i] = static_cast<uint8_t>(rd());
+    }
+  }
+
   CreateBinaryForm();
 }
 
@@ -91,23 +101,30 @@ void WebsocketHeader::CreateBinaryForm() {
     }
   }
 
-  auto header_data = std::shared_ptr<unsigned char>(new unsigned char[header_size_in_bytes],
-                                          std::default_delete<unsigned char[]>());
-  std::memcpy(header_data.get(), &header_start, 1);
-  std::memcpy(header_data.get() +1 , &mask_with_payload_size, 1);
+  if (_mask) {
+    mask_with_payload_size |= 0b10000000;
+    header_size_in_bytes += MASK_KEY_SIZE;
+  }
+
+  _binary_form = std::make_shared<Data>(header_size_in_bytes);
+  _binary_form->Add(1, &header_start);
+  _binary_form->Add(1, &mask_with_payload_size);
   if(payload_field_bit_size > 7) {
     if(payload_field_bit_size == 16) {
       uint16_t size = _final_payload_len;
       size = htobe16(size);
-      std::memcpy(header_data.get() + 2, &size, 2);
+      _binary_form->Add(2, (const unsigned char*)&size);
     }
     else {
       uint64_t size = _final_payload_len;
       size = htobe64(size);
-      std::memcpy(header_data.get() + 2, &size, 8);
+      _binary_form->Add(8, (const unsigned char*)&size);
     }
   }
-  _binary_form = std::make_shared<Data>(header_size_in_bytes, header_data);
+
+  if (_mask) {
+    _binary_form->Add(MASK_KEY_SIZE, (const unsigned char*)_mask_key);
+  }
 }
 
 std::shared_ptr<WebsocketHeader> WebsocketHeader::MaybeCreateFromRawData(std::shared_ptr<Data> data) {
@@ -176,4 +193,12 @@ void WebsocketHeader::FindMaskKey(std::shared_ptr<Data> data) {
   if(_mask) {
     std::memcpy(_mask_key, data->GetCurrentDataRaw() + _header_length - MASK_KEY_SIZE , MASK_KEY_SIZE);
   }
+}
+
+bool WebsocketHeader::HasMask() {
+  return (_mask == 1);
+}
+
+const uint8_t* WebsocketHeader::GetMaskKey() {
+  return _mask_key;
 }

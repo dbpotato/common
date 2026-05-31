@@ -31,15 +31,27 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <vector>
 
 
-WebsocketMessage::WebsocketMessage(const std::string& str)
-    : _header(std::make_shared<WebsocketHeader>(WebsocketHeader::OpCode::TEXT, (uint32_t)str.length()))
-    , _resource(std::make_shared<DataResource>(std::make_shared<Data>(str))) {
+void WebsocketMessage::ApplyMaskToPayload(std::shared_ptr<Data> payload) {
+  auto* mask_key = _header->GetMaskKey();
+  auto buff = payload->GetCurrentDataRaw();
+  uint32_t size = payload->GetCurrentSize();
+
+  for (uint32_t i = 0; i < size; ++i) {
+    buff[i] ^= mask_key[_payload_pos++ % 4];
+  }
+}
+
+WebsocketMessage::WebsocketMessage(const std::string& str, bool client_msg)
+    : _header(std::make_shared<WebsocketHeader>(WebsocketHeader::OpCode::TEXT, (uint32_t)str.length(), client_msg))
+    , _resource(std::make_shared<DataResource>(std::make_shared<Data>(str)))
+    , _payload_pos(0) {
   _header_bin_data = std::make_shared<Data>();
 }
 
 WebsocketMessage::WebsocketMessage(std::shared_ptr<WebsocketHeader> header, std::shared_ptr<DataResource> resource)
     : _header (header)
-    , _resource(resource) {
+    , _resource(resource)
+    , _payload_pos(0) {
   _header_bin_data = std::make_shared<Data>();
 }
 
@@ -60,7 +72,22 @@ std::shared_ptr<Data> WebsocketMessage::GetDataSubset(size_t max_size, size_t of
   if(!_header_bin_data->GetTotalSize()) {
     _header_bin_data = _header->GetBinaryForm();
   }
-  return CreateSubsetFromHeaderAndResource(_header_bin_data, _resource, max_size, offset);
+
+  bool contain_resource_data = false;
+  uint64_t resource_data_offset = 0;
+  std::shared_ptr<Data> subset = CreateSubsetFromHeaderAndResource(_header_bin_data,
+                                                                  _resource,
+                                                                  max_size,
+                                                                  offset,
+                                                                  contain_resource_data,
+                                                                  resource_data_offset);
+  if(contain_resource_data && _header->HasMask()) {
+    std::shared_ptr<Data> subset_cpy = Data::MakeShallowCopy(subset);
+    subset_cpy->SetOffset(resource_data_offset);
+    ApplyMaskToPayload(subset_cpy);
+  }
+
+  return subset;
 }
 
 std::shared_ptr<WebsocketMessage> WebsocketMessage::CreatePingMessage() {

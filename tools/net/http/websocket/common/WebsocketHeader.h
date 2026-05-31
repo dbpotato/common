@@ -41,7 +41,7 @@ public :
   };
 
   WebsocketHeader();
-  WebsocketHeader(OpCode code, uint64_t data_length = 0);
+  WebsocketHeader(OpCode code, uint64_t data_length = 0, bool masked = false);
 
   static std::shared_ptr<WebsocketHeader> MaybeCreateFromRawData(std::shared_ptr<Data> data);
   void ParseFirstBytes(uint8_t header_start, uint8_t mask_with_payload);
@@ -52,6 +52,8 @@ public :
   void CreateBinaryForm();
   std::shared_ptr<Data> GetBinaryForm();
 
+  bool HasMask();
+  const uint8_t* GetMaskKey();
 
   uint8_t _fin : 1;
   uint8_t _rsv1 : 1;

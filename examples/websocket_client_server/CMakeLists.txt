@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2022 - 2025 Adam Kaniewski
+Copyright (c) 2022 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -36,7 +36,7 @@ set(DEFAULT_CXX_FLAGS
  -Wno-delete-non-virtual-dtor"
 )
 
-#add_definitions(-DENABLE_DEBUG_LOGGER)
+add_definitions(-DENABLE_DEBUG_LOGGER)
 
 set(CMAKE_SYSTEM_NAME linux)
 set(DEFAULT_CXX "g++")
@@ -79,9 +79,11 @@ include_directories(
   ${COMMON_DIR}/tools/net/http
   ${COMMON_DIR}/tools/net/http/websocket/common
   ${COMMON_DIR}/tools/net/http/websocket/server
+  ${COMMON_DIR}/tools/net/http/websocket/client
 )
 
 set(COMMON
+  ${COMMON_DIR}/third_party/cpp-base64/base64.cpp
   ${COMMON_DIR}/tools/logger/Logger.cpp
   ${COMMON_DIR}/tools/system/Epool.cpp
   ${COMMON_DIR}/tools/system/PosixThread.cpp
@@ -101,26 +103,30 @@ set(COMMON
   ${COMMON_DIR}/tools/net/http/HttpServer.cpp
   ${COMMON_DIR}/tools/net/http/HttpMessageBuilder.cpp
   ${COMMON_DIR}/tools/net/http/MimeTypeFinder.cpp
-  ${COMMON_DIR}/tools/utils/Data.cpp
-  ${COMMON_DIR}/tools/utils/DataResource.cpp
-  ${COMMON_DIR}/tools/utils/TapeCutter.cpp
-)
-
-set(WEBSOCKET
-  ${COMMON_DIR}/third_party/cpp-base64/base64.cpp
   ${COMMON_DIR}/tools/net/http/websocket/common/WebsocketDataCutter.cpp
   ${COMMON_DIR}/tools/net/http/websocket/common/WebsocketFragmentBuilder.cpp
   ${COMMON_DIR}/tools/net/http/websocket/common/WebsocketHeader.cpp
   ${COMMON_DIR}/tools/net/http/websocket/common/WebsocketMessageBuilder.cpp
   ${COMMON_DIR}/tools/net/http/websocket/common/WebsocketMessage.cpp
-  ${COMMON_DIR}/tools/net/http/websocket/server/WebsocketServer.cpp
+  ${COMMON_DIR}/tools/utils/Data.cpp
+  ${COMMON_DIR}/tools/utils/DataResource.cpp
+  ${COMMON_DIR}/tools/utils/TapeCutter.cpp
 )
 
 set(SERVER
   ${COMMON}
-  ${WEBSOCKET}
-  ${SRC_DIR}/main.cpp
+  ${COMMON_DIR}/tools/net/http/websocket/server/WebsocketServer.cpp
+  ${SRC_DIR}/server_main.cpp
+)
+
+set(CLIENT
+  ${COMMON}
+  ${COMMON_DIR}/tools/net/http/websocket/client/WebsocketClientManager.cpp
+  ${SRC_DIR}/client_main.cpp
 )
 
 add_executable(server ${SERVER})
 target_link_libraries(server ${LIBS})
+
+add_executable(client ${CLIENT})
+target_link_libraries(client ${LIBS})

@@ -60,6 +60,12 @@ protected:
                                                 std::shared_ptr<DataResource> resource,
                                                 size_t max_size,
                                                 size_t offset);
+  std::shared_ptr<Data> CreateSubsetFromHeaderAndResource(std::shared_ptr<Data> header,
+                                                std::shared_ptr<DataResource> resource,
+                                                size_t max_size,
+                                                size_t offset,
+                                                bool& out_contain_resource_data,
+                                                uint64_t& out_resource_data_offset);
 private:
   std::shared_ptr<DataResource> _data_resource;
 };

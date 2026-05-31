@@ -31,7 +31,7 @@ class DataResource;
 
 class WebsocketMessage : public Message {
 public :
-  WebsocketMessage(const std::string& str);
+  WebsocketMessage(const std::string& str, bool client_msg = false);
   WebsocketMessage(std::shared_ptr<WebsocketHeader> header, std::shared_ptr<DataResource> resource);
 
   static std::shared_ptr<WebsocketMessage> CreatePingMessage();
@@ -43,7 +43,9 @@ public :
   std::shared_ptr<DataResource> GetResource();
 
 private :
+  void ApplyMaskToPayload(std::shared_ptr<Data> payload);
   std::shared_ptr<WebsocketHeader> _header;
   std::shared_ptr<DataResource> _resource;
   std::shared_ptr<Data> _header_bin_data;
+  uint64_t _payload_pos;
 };
