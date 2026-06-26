@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2024 Adam Kaniewski
+Copyright (c) 2022 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -35,33 +35,14 @@ public :
   virtual void OnSysFinished(std::shared_ptr<SysCall> syscall, bool success);
 };
 
-class SysLauncher {
-protected:
-  SysLauncher();
-  virtual ~SysLauncher();
-  bool Create(const std::string& command);
-  enum PipeFd {
-    PARENT_READ = 0,
-    PARENT_WRITE,
-    CHILD_READ,
-    CHILD_WRITE
-  };
-  int GetPipe(PipeFd pfd);
-private:
-  void ClosePipe(PipeFd pfd);
-  void ClosePipes();
-
-  int _pipes[2][2];
-  int _child_pid;
-};
-
 class SysCall : public std::enable_shared_from_this<SysCall>
-              , public FdListener
-              , public SysLauncher {
+              , public FdListener {
 public:
-  SysCall(std::shared_ptr<SysCallMgr> mgr);
+  SysCall(std::weak_ptr<SysCallMgr> mgr);
+  ~SysCall();
   void Run(const std::string commnad);
   bool Write(const std::string& msg);
+  void AwaitFinish();
 
   int GetFd() override;
   void OnFdReadReady() override;
@@ -69,7 +50,30 @@ public:
   void OnFdOperationError(bool is_epool_err) override;
 
   const std::string& GetCommand() {return _cmd;}
+
 private:
-  std::shared_ptr<SysCallMgr> _mgr;
+  enum State {
+    STATE_CREATED = 0,
+    STATE_RUNNING,
+    STATE_FINISHED,
+    STATE_KILLED
+  };
+
+  enum PipeFd {
+    PARENT_READ = 0,
+    PARENT_WRITE,
+    CHILD_READ,
+    CHILD_WRITE
+  };
+
+  void ClosePipe(PipeFd pfd);
+  void ClosePipes();
+  bool Create(const std::string& command);
+  int GetPipe(PipeFd pfd);
+
+  std::weak_ptr<SysCallMgr> _mgr;
   std::string _cmd;
+  int _pipes[2][2];
+  int _child_pid;
+  State _state;
 };
