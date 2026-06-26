@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2023 Adam Kaniewski
+Copyright (c) 2020 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -42,7 +42,10 @@ public :
 class FdListenerInfo {
 public:
   FdListenerInfo(std::weak_ptr<FdListener> object);
-  std::shared_ptr<FdListener> lock();
+  std::weak_ptr<FdListener> GetObject();
+  int GetEventFlags();
+  void SetEventFlags(int flags);
+private:
   std::weak_ptr<FdListener> _object;
   int _event_flags;
 };
@@ -55,7 +58,7 @@ public:
   bool Init();
   void AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read = false);
   void RemoveListener(int fd);
-  void SetObservedEvent(int fd, int event_flag, bool enabled);
+  void SetObservedEvent(int fd, uint32_t event_flag, bool enabled);
 
   void SetListenerAwaitingFlags(std::shared_ptr<FdListener> obj, bool waiting_for_read, bool waiting_for_write);
   void SetListenerAwaitingWrite(std::shared_ptr<FdListener> obj, bool waiting_for_write);
@@ -69,7 +72,8 @@ private:
   void Wake();
   void ClearWake();
   void WaitForEvents();
-  void HandleFdEvent(int fd, int event);
+  void HandleFdEvent(std::shared_ptr<FdListener> listener, int fd, uint32_t event);
+  std::shared_ptr<FdListener> GetFdListener(int fd);
   void NotifyListenerOnError(int fd, bool is_epool_err);
   void NotifyListenerOnError(std::shared_ptr<FdListener> obj, bool is_epool_err);
   int _epool_fd;

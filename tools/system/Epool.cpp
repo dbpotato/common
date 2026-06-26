@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2023 Adam Kaniewski
+Copyright (c) 2020 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -26,11 +26,11 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ThreadLoop.h"
 
 #include <cstring>
+#include <set>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <unistd.h>
 #include <array>
-
 
 constexpr int EPOOL_MAX_EVENTS = 32;
 
@@ -41,10 +41,17 @@ FdListenerInfo::FdListenerInfo(std::weak_ptr<FdListener> object)
     , _event_flags(0) {
 }
 
-std::shared_ptr<FdListener> FdListenerInfo::lock() {
-  return _object.lock();
+std::weak_ptr<FdListener> FdListenerInfo::GetObject() {
+  return _object;
 }
 
+int FdListenerInfo::GetEventFlags() {
+  return _event_flags;
+}
+
+void FdListenerInfo::SetEventFlags(int flags) {
+  _event_flags = flags;
+}
 
 Epool::Epool()
     : _epool_fd(-1)
@@ -132,11 +139,14 @@ void Epool::AddListener(std::shared_ptr<FdListener> obj, bool wait_for_read) {
   }
 
   int fd = obj->GetFd();
-  auto result = _listeners.insert(std::make_pair<int, FdListenerInfo>(std::move(obj->GetFd()), FdListenerInfo(obj)));
-  if(!result.second) {
+
+  auto listener = GetFdListener(fd);
+  if(listener){
     DLOG(error, "AddListener FAILED - Already exists : {}", fd);
     NotifyListenerOnError(obj, false);
     return;
+  } else {
+    _listeners.insert(std::make_pair<int, FdListenerInfo>(std::move(obj->GetFd()), FdListenerInfo(obj)));
   }
 
   struct epoll_event event;
@@ -164,7 +174,6 @@ void Epool::RemoveListener(int fd) {
 
   _listeners.erase(fd);
   epoll_ctl(_epool_fd, EPOLL_CTL_DEL, fd, nullptr);
-  close(fd);
 }
 
 void Epool::SetListenerAwaitingRead(std::shared_ptr<FdListener> obj, bool waiting_for_read) {
@@ -185,7 +194,7 @@ void Epool::SetListenerAwaitingFlags(std::shared_ptr<FdListener> obj, bool waiti
   SetListenerAwaitingWrite(obj, waiting_for_write);
 }
 
-void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
+void Epool::SetObservedEvent(int fd, uint32_t event_flag, bool enabled) {
   if(_thread_loop->OnDifferentThread()) {
     _thread_loop->Post(std::bind(&Epool::SetObservedEvent, shared_from_this(), fd, event_flag, enabled));
     Wake();
@@ -198,7 +207,7 @@ void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
     return;
   }
 
-  int current_flags = listener_it->second._event_flags;
+  int current_flags = listener_it->second.GetEventFlags();
   struct epoll_event event;
   std::memset(&event, 0 , sizeof(epoll_event));
   event.data.fd = fd;
@@ -207,7 +216,7 @@ void Epool::SetObservedEvent(int fd, int event_flag, bool enabled) {
   } else {
     event.events = current_flags & ~event_flag;
   }
-  listener_it->second._event_flags = event.events;
+  listener_it->second.SetEventFlags(event.events);
 
   if (epoll_ctl(_epool_fd, EPOLL_CTL_MOD, fd, &event) == -1) {
     DLOG(error, "EPOLL_CTL_MOD failed : {} : {} : {}", fd, current_flags, (uint32_t)event.events);
@@ -225,58 +234,72 @@ void Epool::WaitForEvents() {
 
   std::array<struct epoll_event, EPOOL_MAX_EVENTS> events;
   int epool_size = epoll_wait(_epool_fd, events.data(), EPOOL_MAX_EVENTS, -1);
+  std::set<int> ignored_fds;
 
   for (int i = 0; i < epool_size; ++i) {
     int fd = (int)events[i].data.fd;
+    uint32_t event = events[i].events;
+
     if(fd == _wake_up_fd) {
       ClearWake();
       continue;
     }
-    int event = events[i].events;
+
+    if(ignored_fds.find(fd) != ignored_fds.end()) {
+      continue;
+    }
+
+    if(event == EPOLLHUP) {
+      RemoveListener(fd);
+      continue;
+    }
+
+    auto listener = GetFdListener(fd);
+    if(!listener) {
+      ignored_fds.insert(fd);
+      continue;
+    }
+
     SetObservedEvent(fd, event, false);
-    HandleFdEvent(fd, event);
+    HandleFdEvent(listener, fd, event);
   }
   _thread_loop->Post(std::bind(&Epool::WaitForEvents, shared_from_this()));
 }
 
-void Epool::HandleFdEvent(int fd, int event) {
-  auto listener_it =_listeners.find(fd);
-  if(listener_it == _listeners.end()) {
-    DLOG(warn, "HandleFdEvent - Listener Object not found : {}", fd);
-    return;
-  }
-
-  auto wrapper = listener_it->second;
-  auto obj = wrapper.lock();
-  if(!obj) {
-    DLOG(warn, "HandleFdEvent  - Listener Object already released : {}", fd);
-    RemoveListener(fd);
-    return;
-  }
-
+void Epool::HandleFdEvent(std::shared_ptr<FdListener> listener, int fd, uint32_t event) {
   if(event & EPOLLIN) {
-    obj->OnFdReadReady();
+    listener->OnFdReadReady();
   }
 
   if(event & EPOLLOUT) {
-    obj->OnFdWriteReady();
+    listener->OnFdWriteReady();
+  }
+
+  if(event & EPOLLERR) {
+    listener->OnFdOperationError(true);
   }
 }
 
-void Epool::NotifyListenerOnError(int fd, bool is_epool_err) {
+std::shared_ptr<FdListener> Epool::GetFdListener(int fd) {
+  std::shared_ptr<FdListener> result = nullptr;
   auto listener_it =_listeners.find(fd);
-  if(listener_it == _listeners.end()) {
-    DLOG(warn, "NotifyListenerOnError - Listener Object not found : {}", fd);
-    return;
+  if(listener_it != _listeners.end()) {
+    auto wrapper = listener_it->second;
+    result = wrapper.GetObject().lock();
   }
-  auto wrapper = listener_it->second;
-  auto obj = wrapper.lock();
-  if(!obj) {
-    DLOG(warn, "NotifyListenerOnError  - Listener Object already released : {}", fd);
+
+  if(!result && (listener_it != _listeners.end())) {
     RemoveListener(fd);
-    return;
   }
-  NotifyListenerOnError(obj, is_epool_err);
+
+  return result;
+}
+
+void Epool::NotifyListenerOnError(int fd, bool is_epool_err) {
+  auto listener = GetFdListener(fd);
+  if(listener) {
+    NotifyListenerOnError(listener, is_epool_err);
+  }
 }
 
 void Epool::NotifyListenerOnError(std::shared_ptr<FdListener> obj, bool is_epool_err) {
