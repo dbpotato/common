@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2022 - 2023 Adam Kaniewski
+Copyright (c) 2022 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -48,13 +48,17 @@ public :
   bool FindPayloadAndHeaderSize(std::shared_ptr<Data> data);
   void FindMaskKey(std::shared_ptr<Data> data);
   bool HasControlOpCode();
+  OpCode GetOpCode();
   bool HasFinFlag();
   void CreateBinaryForm();
   std::shared_ptr<Data> GetBinaryForm();
 
   bool HasMask();
   const uint8_t* GetMaskKey();
+  bool UnmaskData(std::shared_ptr<Data> data);
 
+
+//TODO private
   uint8_t _fin : 1;
   uint8_t _rsv1 : 1;
   uint8_t _rsv2 : 1;
@@ -66,5 +70,6 @@ public :
   uint8_t _mask_key[4];
 
   uint32_t _header_length;
+  uint64_t _unmask_offset;
   std::shared_ptr<Data> _binary_form;
 };

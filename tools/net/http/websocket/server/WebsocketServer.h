@@ -35,17 +35,6 @@ class HttpHeader;
 class WebsocketMessage;
 class WebsocketServer;
 
-class WebsocketClientManager : public ClientManager {
-public:
-  WebsocketClientManager(std::shared_ptr<WebsocketServer> owner);
-  bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
-  void OnClientConnected(std::shared_ptr<Client> client) override;
-  void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
-  void OnClientClosed(std::shared_ptr<Client> client) override;
-private:
-  std::weak_ptr<WebsocketServer> _owner;
-};
-
 class WebsocketClientListener {
 public :
   virtual bool OnWsClientConnected(std::shared_ptr<Client> client, const std::string& request_arg) = 0;
@@ -60,9 +49,21 @@ public:
             std::shared_ptr<HttpRequestHandler> request_handler,
             std::shared_ptr<WebsocketClientListener> ws_client_listener,
             int port);
-  friend void WebsocketClientManager::OnClientRead(std::shared_ptr<Client>, std::shared_ptr<Message>);
 
 private:
+  class InternalClientManager : public ClientManager {
+  public:
+    InternalClientManager(std::shared_ptr<WebsocketServer> owner);
+    bool OnClientConnecting(std::shared_ptr<Client> client, NetError err) override;
+    void OnClientConnected(std::shared_ptr<Client> client) override;
+    void OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) override;
+    void OnClientClosed(std::shared_ptr<Client> client) override;
+  private:
+    std::weak_ptr<WebsocketServer> _owner;
+  };
+
+  friend void InternalClientManager::OnClientRead(std::shared_ptr<Client>, std::shared_ptr<Message>);
+
   void ProcessRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpMessage> msg) override;
   bool CheckForProtocolUpgradeRequest(std::shared_ptr<Client> client, std::shared_ptr<HttpHeader> header);
 
@@ -75,6 +76,6 @@ private:
   void OnWsPong(std::shared_ptr<Client> client);
   void OnWsMessage(std::shared_ptr<Client> client, std::shared_ptr<WebsocketMessage> msg);
 
-  std::shared_ptr<WebsocketClientManager> _ws_client_manager;
+  std::shared_ptr<InternalClientManager> _client_manager;
   std::shared_ptr<WebsocketClientListener> _ws_client_listener;
 };

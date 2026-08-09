@@ -101,7 +101,11 @@ void WebsocketClientManager::InternalWebsocketClientManager::OnFailed() {
 }
 
 bool WebsocketClientManager::InternalWebsocketClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
-  return err == NetError::OK;
+  if(err == NetError::OK) {
+    return true;
+  }
+  OnFailed();
+  return false;
 }
 
 void WebsocketClientManager::InternalWebsocketClientManager::OnClientConnected(std::shared_ptr<Client> client) {

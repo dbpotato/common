@@ -41,19 +41,19 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 const std::string HANDSHAKE_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-WebsocketClientManager::WebsocketClientManager(std::shared_ptr<WebsocketServer> owner)
+WebsocketServer::InternalClientManager::InternalClientManager(std::shared_ptr<WebsocketServer> owner)
     : _owner(owner) {
 }
 
-bool WebsocketClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
+bool WebsocketServer::InternalClientManager::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {
   //Should never be called
   return false;
 }
-void WebsocketClientManager::OnClientConnected(std::shared_ptr<Client> client) {
+void WebsocketServer::InternalClientManager::OnClientConnected(std::shared_ptr<Client> client) {
   //Should never be called
 }
 
-void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
+void WebsocketServer::InternalClientManager::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
   auto server = _owner.lock();
   if(!server) {
     return;
@@ -63,6 +63,7 @@ void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::s
   auto header = websocket_msg->GetHeader();
 
   switch (header->_opcode) {
+    case WebsocketHeader::CONTINUE:
     case WebsocketHeader::TEXT:
     case WebsocketHeader::BINARY:
       server->OnWsMessage(client, websocket_msg);
@@ -82,7 +83,7 @@ void WebsocketClientManager::OnClientRead(std::shared_ptr<Client> client, std::s
   }
 }
 
-void WebsocketClientManager::OnClientClosed(std::shared_ptr<Client> client) {
+void WebsocketServer::InternalClientManager::OnClientClosed(std::shared_ptr<Client> client) {
 }
 
 WebsocketServer::WebsocketServer()
@@ -94,7 +95,7 @@ bool WebsocketServer::Init(std::shared_ptr<Connection> connection,
             std::shared_ptr<WebsocketClientListener> ws_client_listener,
             int port) {
   auto this_sptr = std::static_pointer_cast<WebsocketServer>(shared_from_this());
-  _ws_client_manager = std::make_shared<WebsocketClientManager>(this_sptr);
+  _client_manager = std::make_shared<WebsocketServer::InternalClientManager>(this_sptr);
   _ws_client_listener = ws_client_listener;
   return HttpServer::Init(connection, request_handler, port);
 }
@@ -125,7 +126,7 @@ bool WebsocketServer::CheckForProtocolUpgradeRequest(std::shared_ptr<Client> cli
 
   auto msg_builder = std::unique_ptr<WebsocketMessageBuilder>(new WebsocketMessageBuilder());
   client->SetMsgBuilder(std::move(msg_builder));
-  client->SetManager(_ws_client_manager);
+  client->SetManager(_client_manager);
 
   if(http_header->GetFieldValue(HttpHeaderField::SEC_WEBSOCKET_KEY, websocket_key)) {
     std::string accept_hash = PrepareWebSocketAccept(websocket_key);

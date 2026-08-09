@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -23,13 +23,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include "Data.h"
+
 #include "TapeCutter.h"
 #include "WebsocketMessageBuilder.h"
 
-
-class WebsocketHeader;
+class Data;
 class DataResource;
+class WebsocketHeader;
+class WebsocketFragmentBuilder;
+class WebsocketMessage;
+
 
 class WebsocketDataCutter : public TapeCutter {
 public:
@@ -37,10 +40,12 @@ public:
   bool FindCutHeader(std::shared_ptr<Data> data, uint64_t& out_expected_cut_size) override;
   uint64_t AddDataToCurrentCut(std::shared_ptr<Data> data) override;
   void FindCutFooter(std::shared_ptr<Data> data) override;
-  std::shared_ptr<DataResource> GetResource();
-  std::shared_ptr<WebsocketHeader> GetHeader();
+  std::vector<std::shared_ptr<WebsocketMessage>>& GetMessagesToSend();
+
 private:
   WebsocketMessageBuilder& _owner;
   std::shared_ptr<DataResource> _resource;
   std::shared_ptr<WebsocketHeader> _header;
+  std::unique_ptr<WebsocketFragmentBuilder> _fragment_builder;
+  std::vector<std::shared_ptr<WebsocketMessage>> _messages_to_send;
 };

@@ -50,7 +50,8 @@ WebsocketHeader::WebsocketHeader()
     , _mask(0)
     , _payload_len(0)
     , _final_payload_len(0)
-    , _header_length(0) {
+    , _header_length(0)
+    , _unmask_offset(0) {
   _mask_key[0] = _mask_key[1] = _mask_key[2] = _mask_key[3] = 0;
 }
 
@@ -72,6 +73,10 @@ WebsocketHeader::WebsocketHeader(OpCode code, uint64_t data_length, bool masked)
 
 bool WebsocketHeader::HasControlOpCode() {
   return (_opcode >= (uint8_t) OpCode::CLOSE) && (_opcode <= (uint8_t) OpCode::PONG);
+}
+
+WebsocketHeader::OpCode WebsocketHeader::GetOpCode() {
+  return (OpCode)_opcode;
 }
 
 bool WebsocketHeader::HasFinFlag() {
@@ -201,4 +206,22 @@ bool WebsocketHeader::HasMask() {
 
 const uint8_t* WebsocketHeader::GetMaskKey() {
   return _mask_key;
+}
+
+bool WebsocketHeader::UnmaskData(std::shared_ptr<Data> data) {
+  if(!_mask) {
+    return false;
+  }
+  auto buff = data->GetCurrentDataRaw();
+  uint64_t size = data->GetCurrentSize();
+  for(uint64_t i = 0; i < size; ++i) {
+    unsigned char t = buff[i];
+    t = t ^ _mask_key[_unmask_offset++ % 4];
+    if(_unmask_offset > _final_payload_len) {
+      DLOG(error, "unmask_offset is larger than payload size");
+      return false;
+    }
+    buff[i] = t;
+  }
+  return true;
 }

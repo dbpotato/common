@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 - 2024 Adam Kaniewski
+Copyright (c) 2023 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,10 +22,13 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "WebsocketDataCutter.h"
-#include "WebsocketHeader.h"
+
+#include "Data.h"
 #include "DataResource.h"
 #include "Logger.h"
-
+#include "WebsocketFragmentBuilder.h"
+#include "WebsocketHeader.h"
+#include "WebsocketMessage.h"
 
 WebsocketDataCutter::WebsocketDataCutter(WebsocketMessageBuilder& owner)
   : _owner(owner) {
@@ -36,44 +39,60 @@ bool WebsocketDataCutter::FindCutHeader(std::shared_ptr<Data> data, uint64_t& ou
   _header = WebsocketHeader::MaybeCreateFromRawData(data);
   if(!_header) {
     DLOG(error, "Failed to create websocket header");
-    _owner.SetState(WebsocketMessageBuilder::BuilderState::HEADER_PARSE_FAILED);
     return false;
   }
 
   out_expected_cut_size = _header->_final_payload_len;
 
-  _owner.SetState(WebsocketMessageBuilder::BuilderState::RECEIVING_MESSAGE_BODY);
   _resource = std::make_shared<DataResource>();
   _resource->SetExpectedSize(_header->_final_payload_len);
   return true;
 }
 
 uint64_t WebsocketDataCutter::AddDataToCurrentCut(std::shared_ptr<Data> data) {
-  if(_header->_mask) {
-    auto buff = data->GetCurrentDataRaw();
-    uint32_t size = data->GetCurrentSize();
-    for(uint32_t i = 0; i < size; ++i) {
-      unsigned char t = buff[i];
-      t = t ^ _header->_mask_key[i % 4];
-      buff[i] = t;
-    }
-  }
+  _header->UnmaskData(data);
   _resource->AddData(data);
   return _resource->GetSize();
 }
 
 void WebsocketDataCutter::FindCutFooter(std::shared_ptr<Data> data) {
-  if(_header->_fin) {
-    _owner.SetState(WebsocketMessageBuilder::BuilderState::MESSGAE_COMPLETED);
+  std::shared_ptr<WebsocketMessage> msg;
+
+  if(!_header->HasFinFlag()) {
+    if(!_fragment_builder) {
+      auto builder = new WebsocketFragmentBuilder(_header->_opcode, _resource);
+      _fragment_builder = std::unique_ptr<WebsocketFragmentBuilder>(builder);
+    } else {
+      if(!_fragment_builder->AddFragment(_resource)) {
+        //TODO
+        DLOG(error, "Add fragment to builder failed");
+        return;
+      }
+    }
   } else {
-    _owner.SetState(WebsocketMessageBuilder::BuilderState::MESSGAE_FRAGMENT_COMPLETED);
+    if(_fragment_builder) {
+      if(_header->HasControlOpCode()) {
+        msg = std::make_shared<WebsocketMessage>(_header, _resource);
+      } else {
+        if(!_fragment_builder->AddFragment(_resource)) {
+          //TODO
+          DLOG(error, "Add fragment to builder failed");
+          return;
+        }
+        _header->_opcode = _fragment_builder->GetOpcode();
+        msg = std::make_shared<WebsocketMessage>(_header, _fragment_builder->GetResource());
+        _fragment_builder = nullptr;
+      }
+    } else {
+      msg = std::make_shared<WebsocketMessage>(_header, _resource);
+    }
+  }
+
+  if(msg) {
+    _messages_to_send.emplace_back(msg);
   }
 }
 
-std::shared_ptr<DataResource> WebsocketDataCutter::GetResource() {
-  return _resource;
-}
-
-std::shared_ptr<WebsocketHeader> WebsocketDataCutter::GetHeader() {
-  return _header;
+std::vector<std::shared_ptr<WebsocketMessage>>& WebsocketDataCutter::GetMessagesToSend() {
+  return _messages_to_send;
 }
