@@ -35,6 +35,8 @@ public:
   Data(uint64_t size, std::shared_ptr<unsigned char> data);
   Data(uint64_t size, const unsigned char* data);
   Data(uint64_t size);
+  static std::shared_ptr<Data> CreateFromFile(std::string file_name);
+
   void Swap(std::shared_ptr<Data> data);
   static std::shared_ptr<Data> MakeShallowCopy(std::shared_ptr<Data> data);
 

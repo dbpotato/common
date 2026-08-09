@@ -24,6 +24,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Data.h"
 #include "Logger.h"
 
+#include <filesystem>
+#include <fstream>
 
 Data::Data()
     : _allocated_size(0)
@@ -62,6 +64,31 @@ Data::Data(uint64_t size)
     , _offset(0) {
   _data = std::shared_ptr<unsigned char>(new unsigned char[_allocated_size],
                                           std::default_delete<unsigned char[]>());
+}
+
+std::shared_ptr<Data> Data::CreateFromFile(std::string file_name) {
+  std::fstream stream;
+
+  stream.open(file_name, std::ios::binary | std::ios::in | std::ios::ate);
+  if(!stream.is_open()) {
+    return nullptr;
+  }
+
+  stream.seekg(0, std::ios::end);
+  auto stream_end = stream.tellg();
+  if(stream_end == -1) {
+    return nullptr;
+  }
+  uint64_t size = (uint64_t)stream_end;
+  if(!size) {
+    return nullptr;
+  }
+  stream.seekg(0, std::ios::beg);
+
+  std::shared_ptr<Data> result = std::make_shared<Data>(size);
+  stream.read((char*)result->GetCurrentDataRaw(), stream_end); //TODO return val check
+  result->SetCurrentSize(size);
+  return result;
 }
 
 void Data::Swap(std::shared_ptr<Data> data) {
