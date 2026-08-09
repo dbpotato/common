@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Logger.h"
 #include "Client.h"
 #include "Data.h"
+#include "DataResource.h"
 #include "Message.h"
 #include "Config.h"
 #include "Server.h"
@@ -49,7 +50,7 @@ private :
 };
 
 void ServerListener::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
-  log()->info("Client {} : Read : {}", client->GetId(), msg->GetData()->ToString());
+  log()->info("Client {} : Read : {}", client->GetId(), msg->GetDataResource()->GetMemCache()->ToString());
   log()->info("Sending Response : {}", Config::MSG_FOR_CLIENT);
   client->Send(std::make_shared<Message>(Config::MSG_FOR_CLIENT));
 }
