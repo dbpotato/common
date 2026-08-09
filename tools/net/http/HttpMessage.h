@@ -35,6 +35,8 @@ public :
   HttpMessage(int status_code,
               const std::string& body_text = {});
 
+  HttpMessage(int status_code,
+              std::shared_ptr<DataResource> resource);
 
   HttpMessage(HttpHeaderMethod::Type method,
               const std::string& request,

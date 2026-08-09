@@ -34,6 +34,13 @@ HttpMessage::HttpMessage(int status_code,
   _resource = std::make_shared<DataResource>(std::make_shared<Data>(body_text));
 }
 
+HttpMessage::HttpMessage(int status_code,
+              std::shared_ptr<DataResource> resource)
+: Message() {
+  CreateHeader(status_code, resource->GetSize());
+  _resource = resource;
+}
+
 HttpMessage::HttpMessage(HttpHeaderMethod::Type method,
                          const std::string& request,
                          const std::string& body_text)
