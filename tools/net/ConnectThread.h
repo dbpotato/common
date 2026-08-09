@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2020 - 2023 Adam Kaniewski
+Copyright (c) 2020 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -25,6 +25,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "NetUtils.h"
 
+#include <cstdint>
 #include <map>
 #include <memory>
 

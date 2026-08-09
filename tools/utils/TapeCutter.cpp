@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2023 Adam Kaniewski
+Copyright (c) 2023 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "TapeCutter.h"
+#include "Logger.h"
 
 const int MAX_HEADER_LENGTH = 8*1024;
 
@@ -74,6 +75,10 @@ bool TapeCutter::AddData(std::shared_ptr<Data> data) {
     add_data->SetCurrentSize(available_cut_data);
 
     _current_cut_size = AddDataToCurrentCut(add_data);
+    if(_current_cut_size > _expected_cut_size) {
+      DLOG(error, "Cut size exceeds expected size");
+      return false;
+    }
 
     if(_current_cut_size == _expected_cut_size) {
       data->AddOffset(available_cut_data);
@@ -98,6 +103,6 @@ void TapeCutter::Reset() {
 }
 
 void TapeCutter::OnEndFound(std::shared_ptr<Data> data) {
-  Reset();
   FindCutFooter(data);
+  Reset();
 }
