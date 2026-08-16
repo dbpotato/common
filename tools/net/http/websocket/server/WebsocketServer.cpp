@@ -119,11 +119,6 @@ bool WebsocketServer::CheckForProtocolUpgradeRequest(std::shared_ptr<Client> cli
     return false;
   }
 
-  if(!_ws_client_listener->OnWsClientConnected(client, http_header->GetRequestTarget())) {
-    _server->RemoveClient(client);
-    return true;
-  }
-
   auto msg_builder = std::unique_ptr<WebsocketMessageBuilder>(new WebsocketMessageBuilder());
   client->SetMsgBuilder(std::move(msg_builder));
   client->SetManager(_client_manager);
@@ -135,6 +130,11 @@ bool WebsocketServer::CheckForProtocolUpgradeRequest(std::shared_ptr<Client> cli
     DLOG(warn, "OnUpgradeRequest : cant find SEC_WEBSOCKET_KEY :\n{}", http_header->ToString());
     return false;
   }
+
+  if(!_ws_client_listener->OnWsClientConnected(client, http_header->GetRequestTarget())) {
+    _server->RemoveClient(client);
+  }
+
   return true;
 }
 
