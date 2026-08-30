@@ -64,7 +64,7 @@ void ClientManagerImpl::OnClientRead(std::shared_ptr<Client> client, std::shared
     return;
   }
 
-  auto data = ws_msg->GetResource()->GetMemCache();
+  auto data = ws_msg->GetResource()->GetData();
   log()->info("WS Client got message : {}", data ? data->ToString() : std::string("<empty>"));
 }
 

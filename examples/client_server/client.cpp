@@ -51,7 +51,7 @@ private:
 };
 
 void ClientHandler::OnClientRead(std::shared_ptr<Client> client, std::shared_ptr<Message> msg) {
-  log()->info("Client Read : {}", msg->GetDataResource()->GetMemCache()->ToString());
+  log()->info("Client Read : {}", msg->GetDataResource()->GetData()->ToString());
 }
 
 bool ClientHandler::OnClientConnecting(std::shared_ptr<Client> client, NetError err) {

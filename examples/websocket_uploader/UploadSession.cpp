@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2024 Adam Kaniewski
+Copyright (c) 2024 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -87,7 +87,7 @@ void UploadSession::HandleRequest(std::shared_ptr<WebsocketMessage> message) {
     return;
   }
 
-  std::string msg_str = msg_resource->GetMemCache()->ToString();
+  std::string msg_str = msg_resource->GetData()->ToString();
   if(json.Parse(msg_str)) {
     _file_name = json.ValueToString("file_name");
     _file_directory_path = json.ValueToString("file_directory_path");

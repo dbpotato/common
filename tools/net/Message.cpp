@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2018 - 2025 Adam Kaniewski
+Copyright (c) 2018 - 2026 Adam Kaniewski
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -125,7 +125,7 @@ std::shared_ptr<Data> Message::CreateSubsetFromHeaderAndResource(std::shared_ptr
   }
 
   if(!resource->UseDriveCache() && !header_data_size) {
-    result = Data::MakeShallowCopy(resource->GetMemCache());
+    result = Data::MakeShallowCopy(resource->GetData());
     result->SetOffset(resource_offset);
     result->SetCurrentSize(resource_cpy_size);
   } else {

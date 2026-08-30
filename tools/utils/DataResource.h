@@ -44,7 +44,7 @@ public:
   uint64_t GetSize();
   uint64_t GetExpectedSize();
   void SetExpectedSize(uint64_t expected_size);
-  std::shared_ptr<Data> GetMemCache();
+  std::shared_ptr<Data> GetData(bool only_from_mem_cache = false);
   std::shared_ptr<Data> GetLastRecivedData();
   std::fstream& GetDriveCache();
   std::string GetDriveCacheFileName();

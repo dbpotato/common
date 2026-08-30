@@ -158,7 +158,7 @@ bool DataResource::AddData(std::shared_ptr<DataResource> resource) {
     delete[] buff;
 
   } else {
-    AddData(resource->GetMemCache());
+    AddData(resource->GetData());
   }
   return true;
 }
@@ -177,8 +177,19 @@ bool DataResource::WriteToDrive(std::shared_ptr<Data> data) {
   return true;
 }
 
-std::shared_ptr<Data> DataResource::GetMemCache() {
-  return _mem_cached_data;
+std::shared_ptr<Data> DataResource::GetData(bool only_from_mem_cache) {
+  if(UseDriveCache() && only_from_mem_cache) {
+    return nullptr;
+  }
+
+  if(!UseDriveCache()) {
+    return _mem_cached_data;
+  }
+
+  auto data = std::make_shared<Data>(GetSize());
+  CopyToBuff( data->GetCurrentDataRaw(), GetSize(), 0);
+  data->SetCurrentSize(GetSize());
+  return data;
 }
 
 std::shared_ptr<Data> DataResource::GetLastRecivedData() {
