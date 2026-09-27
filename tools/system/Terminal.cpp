@@ -172,6 +172,21 @@ bool Terminal::ConfigureSlavePty() {
   close(_master_fd);
   setsid();
 
+  int signals[] = {
+    SIGINT,
+    SIGQUIT,
+    SIGTSTP,
+    SIGTTIN,
+    SIGTTOU,
+    SIGCHLD,
+    SIGPIPE,
+    SIGTERM
+  };
+
+  for(int sig : signals) {
+    signal(sig, SIG_DFL);
+  }
+
 #ifdef TIOCSCTTY
   if(ioctl(_slave_fd, TIOCSCTTY, nullptr) < 0) {
     return false;
